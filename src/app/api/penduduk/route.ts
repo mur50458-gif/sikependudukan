@@ -147,10 +147,20 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     const deleteAll = searchParams.get('all');
 
-    if (deleteAll === 'true') {
-      const count = await db.penduduk.count();
+if (deleteAll === 'true') {
+      const countPenduduk = await db.penduduk.count();
+      const countSementara = await db.pendudukSementara.count();
+      const countKejadian = await db.kejadian.count();
+      const countLaporan = await db.laporanBulanan.count();
+
       await db.penduduk.deleteMany();
-      return NextResponse.json({ message: `Semua data penduduk berhasil dihapus (${count} data)` });
+      await db.pendudukSementara.deleteMany();
+      await db.kejadian.deleteMany();
+      await db.laporanBulanan.deleteMany();
+
+      return NextResponse.json({
+        message: `Seluruh data berhasil dihapus: ${countPenduduk} penduduk, ${countSementara} penduduk sementara, ${countKejadian} kejadian, ${countLaporan} laporan tersimpan`
+      });
     }
 
     if (!id) {
