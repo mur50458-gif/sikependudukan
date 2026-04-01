@@ -100,14 +100,6 @@ export default function Home() {
           <p className="text-[11px] text-emerald-800 font-medium">{ALAMAT}</p>
         </div>
 
-        {/* Background logo watermark - di bawah header, area konten tab */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/bg-logo.png"
-          alt=""
-          className="fixed top-24 left-1/2 -translate-x-1/2 w-[68vw] max-w-[42rem] h-auto opacity-15 pointer-events-none select-none z-0"
-          aria-hidden="true"
-        />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full grid grid-cols-5 mb-3 h-auto bg-white border shadow-sm rounded-lg p-1">
