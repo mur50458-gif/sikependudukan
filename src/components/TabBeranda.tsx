@@ -62,7 +62,7 @@ export default function TabBeranda({ isAdmin = false }: TabBerandaProps) {
         setDeleteMsg(result.message);
         setDeleteDialogOpen(false);
         setDeleteConfirmText('');
-        fetchStatistik();
+        window.location.reload();
       } else {
         const err = await res.json();
         setDeleteMsg(err.error || 'Gagal menghapus data');
