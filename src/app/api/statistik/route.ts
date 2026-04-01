@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hitungUmur, isWajibKTP, formatTanggal } from '@/lib/utils-kependudukan';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const allPenduduk = await db.penduduk.findMany();
