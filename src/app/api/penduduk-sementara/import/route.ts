@@ -32,10 +32,13 @@ export async function POST(request: NextRequest) {
     const normalizeStatus = (raw: string): string => {
       const upper = raw.toUpperCase().trim();
       if (!upper) return '';
-      if (upper === 'KONTRAN' || upper === 'KONTRAK') return 'KONTRAK';
-      if (upper === 'SEWA') return 'SEWA';
+      if (upper.includes('KONTRAK') || upper.includes('KONTRAN')) return 'KONTRAK';
+      if (upper.includes('SEWA')) return 'SEWA';
       if (upper.includes('MENUMPANG') || upper.includes('NUMPANG')) return 'NUMPANG KELUARGA';
-      if (upper === 'KOS') return 'KOS';
+      if (upper.includes('KOS') || upper.includes('KOST')) return 'KOS';
+      if (upper.includes('NUMPANG') || upper.includes('NOMPANG')) return 'NUMPANG KELUARGA';
+      if (upper.includes('MENUMPANG')) return 'MENUMPANG';
+      return upper;
       return upper;
     };
 
