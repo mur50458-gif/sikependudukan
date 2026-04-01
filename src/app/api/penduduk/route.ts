@@ -144,13 +144,20 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const id = parseInt(searchParams.get('id') || '');
+    const id = searchParams.get('id');
+    const deleteAll = searchParams.get('all');
+
+    if (deleteAll === 'true') {
+      const count = await db.penduduk.count();
+      await db.penduduk.deleteMany();
+      return NextResponse.json({ message: `Semua data penduduk berhasil dihapus (${count} data)` });
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'ID diperlukan' }, { status: 400 });
     }
 
-    await db.penduduk.delete({ where: { id } });
+    await db.penduduk.delete({ where: { id: parseInt(id) } });
     return NextResponse.json({ message: 'Data berhasil dihapus' });
   } catch (error) {
     console.error(error);

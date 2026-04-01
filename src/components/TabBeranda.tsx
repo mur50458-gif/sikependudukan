@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Trash2, AlertTriangle, Loader2, Database } from 'lucide-react';
 
 interface Statistik {
   totalKK: number;
@@ -32,13 +35,45 @@ interface Statistik {
   kejadianCounts: Record<string, { l: number; p: number }>;
 }
 
-export default function TabBeranda() {
+interface TabBerandaProps {
+  isAdmin?: boolean;
+}
+
+export default function TabBeranda({ isAdmin = false }: TabBerandaProps) {
   const [statistik, setStatistik] = useState<Statistik | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleteMsg, setDeleteMsg] = useState('');
 
   useEffect(() => {
     fetchStatistik();
   }, []);
+
+  const handleDeleteAll = async () => {
+    if (deleteConfirmText !== 'HAPUS') return;
+    setDeleting(true);
+    setDeleteMsg('');
+    try {
+      const res = await fetch('/api/penduduk?all=true', { method: 'DELETE' });
+      if (res.ok) {
+        const result = await res.json();
+        setDeleteMsg(result.message);
+        setDeleteDialogOpen(false);
+        setDeleteConfirmText('');
+        fetchStatistik();
+      } else {
+        const err = await res.json();
+        setDeleteMsg(err.error || 'Gagal menghapus data');
+      }
+    } catch (error) {
+      console.error(error);
+      setDeleteMsg('Gagal menghapus data');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const fetchStatistik = async () => {
     try {
@@ -77,7 +112,95 @@ export default function TabBeranda() {
   }
 
   return (
-    <div className="space-y-4">
+       <div className="space-y-4">
+
+      {/* Panel Admin - Hapus Semua Data */}
+      {isAdmin && (
+        <Card className="border-red-200 bg-red-50/50">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-red-500" />
+                <div>
+                  <p className="text-sm font-semibold text-red-700">Manajemen Data Penduduk</p>
+                  <p className="text-[10px] text-red-500 mt-0.5">
+                    Hapus semua data penduduk dari database ({statistik?.totalPenduduk || 0} data, {statistik?.totalKK || 0} KK)
+                  </p>
+                </div>
+              </div>
+              <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
+                setDeleteDialogOpen(open);
+                if (!open) setDeleteConfirmText('');
+              }}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-100 hover:text-red-700 text-xs gap-1.5">
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Hapus Semua Data
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-red-700">
+                      <AlertTriangle className="h-5 w-5" />
+                      Konfirmasi Hapus Semua Data
+                    </DialogTitle>
+                    <DialogDescription className="text-sm text-muted-foreground">
+                      Tindakan ini akan menghapus <strong>seluruh {statistik?.totalPenduduk || 0} data penduduk</strong> ({statistik?.totalKK || 0} KK) dari database secara permanen.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3 py-2">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 space-y-1">
+                      <p className="font-semibold">Peringatan:</p>
+                      <p>- Data yang dihapus tidak dapat dikembalikan</p>
+                      <p>- Pastikan Anda sudah melakukan backup jika diperlukan</p>
+                      <p>- Semua data penduduk akan terhapus termasuk informasi KK</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Ketik <strong className="text-red-600">HAPUS</strong> untuk konfirmasi:
+                      </label>
+                      <input
+                        type="text"
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder="HAPUS"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-red-400"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter className="gap-2 sm:gap-0">
+                    <Button
+                      variant="outline"
+                      onClick={() => { setDeleteDialogOpen(false); setDeleteConfirmText(''); }}
+                      disabled={deleting}
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDeleteAll}
+                      disabled={deleting || deleteConfirmText !== 'HAPUS'}
+                      className="gap-1.5"
+                    >
+                      {deleting ? (
+                        <><Loader2 className="h-4 w-4 animate-spin" /> Menghapus...</>
+                      ) : (
+                        <><Trash2 className="h-4 w-4" /> Ya, Hapus Semua</>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+            {deleteMsg && (
+              <div className={`mt-2 text-xs flex items-center gap-1 ${deleteMsg.includes('berhasil') ? 'text-emerald-600' : 'text-red-500'}`}>
+                {deleteMsg}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Main Cards */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="bg-emerald-600 text-white border-0">

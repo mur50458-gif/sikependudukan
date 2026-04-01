@@ -141,7 +141,7 @@ export default function Home() {
           </TabsList>
 
           <TabsContent value="beranda">
-            <TabBeranda />
+            <TabBeranda isAdmin={isAdmin} />
           </TabsContent>
           <TabsContent value="penduduk">
             <TabPenduduk isAdmin={isAdmin} />
