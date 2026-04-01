@@ -37,9 +37,10 @@ interface Statistik {
 
 interface TabBerandaProps {
   isAdmin?: boolean;
+  isActive?: boolean;
 }
 
-export default function TabBeranda({ isAdmin = false }: TabBerandaProps) {
+export default function TabBeranda({ isAdmin = false, isActive = false }: TabBerandaProps) {
   const [statistik, setStatistik] = useState<Statistik | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -50,6 +51,13 @@ export default function TabBeranda({ isAdmin = false }: TabBerandaProps) {
   useEffect(() => {
     fetchStatistik();
   }, []);
+
+  // Auto-refresh setiap kali tab Beranda menjadi aktif
+  useEffect(() => {
+    if (isActive) {
+      fetchStatistik();
+    }
+  }, [isActive]);
 
   const handleDeleteAll = async () => {
     if (deleteConfirmText !== 'HAPUS') return;

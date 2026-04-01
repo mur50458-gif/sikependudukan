@@ -141,7 +141,7 @@ export default function Home() {
           </TabsList>
 
           <TabsContent value="beranda">
-            <TabBeranda isAdmin={isAdmin} />
+            <TabBeranda isAdmin={isAdmin} isActive={activeTab === 'beranda'} />
           </TabsContent>
           <TabsContent value="penduduk">
             <TabPenduduk isAdmin={isAdmin} />
