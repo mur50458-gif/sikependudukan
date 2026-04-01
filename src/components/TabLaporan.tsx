@@ -95,7 +95,7 @@ export default function TabLaporan({ isAdmin = true }: TabLaporanProps) {
     const found = savedLaporan.find(
       s => s.bulan === parseInt(b) && s.tahun === parseInt(t)
     );
-    setKeterangan(found?.keterangan || '');
+    setKeterangan(found?.keterangan ?? '');
   };
 
   const generateLaporan = async () => {
@@ -259,8 +259,8 @@ export default function TabLaporan({ isAdmin = true }: TabLaporanProps) {
         if (leftItem) {
           const isJumlah = leftItem.label === 'JUMLAH';
           html += `<td class="${isJumlah ? 'bld' : ''}">${leftItem.label}</td>`;
-          html += `<td class="${isJumlah ? 'bld' : ''}">${leftItem.l || ''}</td>`;
-          html += `<td class="${isJumlah ? 'bld' : ''}">${leftItem.p || ''}</td>`;
+          html += `<td class="${isJumlah ? 'bld' : ''}">${leftItem.l ?? ''}</td>`;
+          html += `<td class="${isJumlah ? 'bld' : ''}">${leftItem.p ?? ''}</td>`;
         } else {
           html += '<td></td><td></td><td></td>';
         }
@@ -287,8 +287,8 @@ export default function TabLaporan({ isAdmin = true }: TabLaporanProps) {
           const rightItem = data.rightAges[rightIdx];
           if (rightItem.label !== 'JUMLAH') {
             html += `<td>${rightItem.label}</td>`;
-            html += `<td>${rightItem.l || ''}</td>`;
-            html += `<td>${rightItem.p || ''}</td>`;
+            html += `<td>${rightItem.l ?? ''}</td>`;
+            html += `<td>${rightItem.p ?? ''}</td>`;
           } else {
             html += '<td></td><td></td><td></td>';
           }
@@ -545,8 +545,8 @@ export default function TabLaporan({ isAdmin = true }: TabLaporanProps) {
       rows.push(
         <tr key={`ld-${i}`}>
           <td className={isBold ? boldCellClass : cellClass}>{item.label}</td>
-          <td className={isBold ? boldCellClass : cellClass}>{item.l || ''}</td>
-          <td className={isBold ? boldCellClass : cellClass}>{item.p || ''}</td>
+          <td className={isBold ? boldCellClass : cellClass}>{item.l ?? ''}</td>
+          <td className={isBold ? boldCellClass : cellClass}>{item.p ?? ''}</td>
         </tr>
       );
     }
@@ -581,8 +581,8 @@ export default function TabLaporan({ isAdmin = true }: TabLaporanProps) {
       rows.push(
         <tr key={`rd-${i}`}>
           <td className={cellClass}>{item.label}</td>
-          <td className={cellClass}>{item.l || ''}</td>
-          <td className={cellClass}>{item.p || ''}</td>
+          <td className={cellClass}>{item.l ?? ''}</td>
+          <td className={cellClass}>{item.p ?? ''}</td>
         </tr>
       );
     }
