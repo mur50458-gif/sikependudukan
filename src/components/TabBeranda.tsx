@@ -13,6 +13,8 @@ interface Statistik {
   pendudukP: number;
   bayiL: number;
   bayiP: number;
+  dptL: number;
+  dptP: number;
   ageDist: Record<string, { l: number; p: number }>;
   wajibKTPL: number;
   wajibKTPP: number;
@@ -52,12 +54,27 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
     fetchStatistik();
   }, []);
 
-  // Auto-refresh setiap kali tab Beranda menjadi aktif
   useEffect(() => {
     if (isActive) {
       fetchStatistik();
     }
   }, [isActive]);
+
+  const fetchStatistik = async () => {
+    try {
+      const res = await fetch('/api/statistik');
+      if (res.ok) {
+        const data = await res.json();
+        setStatistik(data);
+      } else {
+        setStatistik(null);
+      }
+    } catch (error) {
+      setStatistik(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDeleteAll = async () => {
     if (deleteConfirmText !== 'HAPUS') return;
@@ -70,30 +87,15 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
         setDeleteMsg(result.message);
         setDeleteDialogOpen(false);
         setDeleteConfirmText('');
-        window.location.reload();
+        fetchStatistik();
       } else {
         const err = await res.json();
         setDeleteMsg(err.error || 'Gagal menghapus data');
       }
     } catch (error) {
-      console.error(error);
       setDeleteMsg('Gagal menghapus data');
     } finally {
       setDeleting(false);
-    }
-  };
-
-  const fetchStatistik = async () => {
-    try {
-      const res = await fetch('/api/statistik');
-      if (res.ok) {
-        const data = await res.json();
-        setStatistik(data);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -109,7 +111,6 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
     return <div className="p-4 text-center text-muted-foreground">Gagal memuat data statistik</div>;
   }
 
-  // Build age distribution array (1-100)
   const ageData: { age: number; l: number; p: number }[] = [];
   for (let i = 1; i <= 100; i++) {
     const key = String(i);
@@ -120,9 +121,8 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
   }
 
   return (
-       <div className="space-y-4">
+    <div className="space-y-4">
 
-      {/* Panel Admin - Hapus Semua Data */}
       {isAdmin && (
         <Card className="border-red-200 bg-red-50/50">
           <CardContent className="p-3">
@@ -130,9 +130,9 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
               <div className="flex items-center gap-2">
                 <Database className="h-5 w-5 text-red-500" />
                 <div>
-                  <p className="text-sm font-semibold text-red-700">Manajemen Data Penduduk</p>
+                  <p className="text-sm font-semibold text-red-700">Hapus Seluruh Data</p>
                   <p className="text-[10px] text-red-500 mt-0.5">
-                    Hapus semua data penduduk dari database ({statistik?.totalPenduduk || 0} data, {statistik?.totalKK || 0} KK)
+                    Bersihkan seluruh database (penduduk, sementara, kejadian, laporan)
                   </p>
                 </div>
               </div>
@@ -150,18 +150,23 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-red-700">
                       <AlertTriangle className="h-5 w-5" />
-                      Konfirmasi Hapus Semua Data
+                      Hapus Seluruh Data
                     </DialogTitle>
                     <DialogDescription className="text-sm text-muted-foreground">
-                      Tindakan ini akan menghapus <strong>seluruh {statistik?.totalPenduduk || 0} data penduduk</strong> ({statistik?.totalKK || 0} KK) dari database secara permanen.
+                      Semua data akan dihapus permanen dari database.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-3 py-2">
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 space-y-1">
+                      <p className="font-semibold">Data yang akan dihapus:</p>
+                      <p>- Data Penduduk ({statistik?.totalPenduduk || 0} orang, {statistik?.totalKK || 0} KK)</p>
+                      <p>- Penduduk Sementara ({statistik?.sementaraL + statistik?.sementaraP || 0} orang)</p>
+                      <p>- Kejadian (lahir, meninggal, pindah, datang)</p>
+                      <p>- Riwayat Laporan Tersimpan</p>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700">
                       <p className="font-semibold">Peringatan:</p>
-                      <p>- Data yang dihapus tidak dapat dikembalikan</p>
-                      <p>- Pastikan Anda sudah melakukan backup jika diperlukan</p>
-                      <p>- Semua data penduduk akan terhapus termasuk informasi KK</p>
+                      <p>Data yang dihapus tidak dapat dikembalikan!</p>
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-medium text-muted-foreground">
@@ -191,9 +196,15 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
                       className="gap-1.5"
                     >
                       {deleting ? (
-                        <><Loader2 className="h-4 w-4 animate-spin" /> Menghapus...</>
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Menghapus...
+                        </>
                       ) : (
-                        <><Trash2 className="h-4 w-4" /> Ya, Hapus Semua</>
+                        <>
+                          <Trash2 className="h-4 w-4" />
+                          Ya, Hapus Semua
+                        </>
                       )}
                     </Button>
                   </DialogFooter>
@@ -202,6 +213,11 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
             </div>
             {deleteMsg && (
               <div className={`mt-2 text-xs flex items-center gap-1 ${deleteMsg.includes('berhasil') ? 'text-emerald-600' : 'text-red-500'}`}>
+                {deleteMsg.includes('berhasil') ? (
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                )}
                 {deleteMsg}
               </div>
             )}
@@ -209,7 +225,6 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
         </Card>
       )}
 
-      {/* Main Cards */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="bg-emerald-600 text-white border-0">
           <CardContent className="p-3">
@@ -257,6 +272,17 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
 
         <Card className="bg-indigo-500 text-white border-0">
           <CardContent className="p-3">
+            <p className="text-[10px] opacity-80 font-medium">DPT (USIA ≥ 17 TH)</p>
+            <p className="text-2xl font-bold">{statistik.dptL + statistik.dptP}</p>
+            <div className="flex gap-2 mt-1 text-[10px] opacity-80">
+              <span>L: {statistik.dptL}</span>
+              <span>P: {statistik.dptP}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-violet-500 text-white border-0">
+          <CardContent className="p-3">
             <p className="text-[10px] opacity-80 font-medium">PENDUDUK SEMENTARA</p>
             <p className="text-2xl font-bold">{statistik.sementaraKK} KK</p>
             <p className="text-lg font-semibold">{statistik.sementaraL + statistik.sementaraP} penduduk</p>
@@ -268,7 +294,6 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
         </Card>
       </div>
 
-      {/* Tabel Wajib KTP */}
       <Card>
         <CardHeader className="pb-2 pt-3 px-4">
           <CardTitle className="text-sm font-semibold text-emerald-700">
@@ -325,7 +350,6 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
         </CardContent>
       </Card>
 
-      {/* Kejadian Bulan Ini */}
       <Card>
         <CardHeader className="pb-2 pt-3 px-4">
           <CardTitle className="text-sm font-semibold text-emerald-700">Kejadian Bulan Ini</CardTitle>
@@ -334,7 +358,7 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
           <div className="grid grid-cols-4 gap-2">
             {(['LAHIR', 'MATI', 'PINDAH', 'DATANG'] as const).map((type) => {
               const d = statistik.kejadianCounts[type];
-              const color = type === 'LAHIR' ? 'text-green-600 bg-green-50' 
+              const color = type === 'LAHIR' ? 'text-green-600 bg-green-50'
                 : type === 'MATI' ? 'text-red-600 bg-red-50'
                 : type === 'PINDAH' ? 'text-orange-600 bg-orange-50'
                 : 'text-blue-600 bg-blue-50';
@@ -353,7 +377,6 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
         </CardContent>
       </Card>
 
-      {/* Age Distribution */}
       <Card>
         <CardHeader className="pb-2 pt-3 px-4">
           <CardTitle className="text-sm font-semibold text-emerald-700">Distribusi Usia Penduduk (1-100 Tahun)</CardTitle>
