@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Penduduk {
+  id               Int       @id @default(autoincrement())
+  noKK             String
+  nik              String    @unique
+  namaLengkap      String
+  jenisKelamin     String
+  statusKeluarga   String
+  tempatLahir      String
+  tanggalLahir     DateTime
+  agama            String
+  pendidikan       String
+  pekerjaan        String
+  statusPerkawinan String
+  kewarganegaraan  String
+  namaAyah         String
+  namaIbu          String
+  namaPanggilan    String?
+  noHP             String?
+  punyaKTP         String    @default("BELUM")
+  bantuan          String    @default("[]")
+  bpjs             String?
+  keterangan       String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model PendudukSementara {
+  id                Int       @id @default(autoincrement())
+  noKK              String
+  nik               String    @unique
+  namaLengkap       String
+  jenisKelamin      String
+  statusKeluarga    String
+  tempatLahir       String
+  tanggalLahir      DateTime
+  agama             String
+  pendidikan        String
+  pekerjaan         String
+  statusPerkawinan  String
+  kewarganegaraan   String
+  namaAyah          String
+  namaIbu           String
+  namaPanggilan     String?
+  noHP              String?
+  statusKeterangan  String
+  alamatAsal        String
+  bantuan           String    @default("[]")
+  bpjs              String?
+  tanggalMasuk      DateTime
+  tanggalKeluar     DateTime?
+  keterangan        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model LaporanBulanan {
+  id         Int      @id @default(autoincrement())
+  bulan      Int
+  tahun      Int
+  data       String   // JSON string of report data
+  keterangan String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([bulan, tahun])
+}
+
+model Kejadian {
+  id            Int       @id @default(autoincrement())
+  jenisKejadian String
+  noKK          String
+  namaLengkap   String
+  nik           String?
+  jenisKelamin  String
+  tanggal       DateTime
+  keterangan    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}

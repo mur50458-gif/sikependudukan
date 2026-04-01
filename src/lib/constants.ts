@@ -1,0 +1,74 @@
+export const ALAMAT = 'KP. CEMPLANG, KELURAHAN SUKAMAJU, KECAMATAN CIBUNGBULANG, KABUPATEN BOGOR, PROVINSI JAWA BARAT, KODE POS 16630';
+
+export const JENIS_KELAMIN = ['LAKI-LAKI', 'PEREMPUAN'] as const;
+
+export const STATUS_KELUARGA = [
+  'KEPALA KELUARGA',
+  'ISTRI',
+  'ANAK',
+  'MERTUA',
+  'MENANTU',
+  'CUCU',
+  'LAINNYA',
+] as const;
+
+export const AGAMA = ['ISLAM', 'KRISTEN', 'BUDHA', 'HINDU', 'LAINNYA'] as const;
+
+export const PENDIDIKAN = [
+  'TIDAK/BELUM SEKOLAH',
+  'BELUM TAMAT SD/SEDERAJAT',
+  'TIDAK TAMAT SD/SEDERAJAT',
+  'SD/SEDERAJAT',
+  'SLTP/SEDERAJAT',
+  'SLTA/SEDERAJAT',
+  'PAKET A',
+  'PAKET B',
+  'PAKET C',
+  'SLB',
+  'D1',
+  'D2',
+  'D3',
+  'S1',
+  'S2',
+  'S3',
+] as const;
+
+export const PEKERJAAN = [
+  'PELAJAR/MAHASISWA',
+  'PNS',
+  'SOPIR',
+  'USTADZ/MUBALIGH',
+  'PEDAGANG',
+  'BELUM/TIDAK BEKERJA',
+  'BURUH HARIAN LEPAS',
+  'MENGURUS RUMAH TANGGA',
+  'WIRASWASTA',
+  'PEGAWAI ASN',
+  'KARYAWAN SWASTA',
+  'TNI',
+  'POLRI',
+] as const;
+
+export const STATUS_PERKAWINAN = [
+  'BELUM MENIKAH',
+  'MENIKAH TERCATAT',
+  'MENIKAH TIDAK TERCATAT',
+  'CERAI HIDUP',
+  'CERAI MATI',
+  'CERAI TIDAK TERCATAT',
+] as const;
+
+export const BANTUAN_OPTIONS = ['TIDAK', 'PKH', 'BPNT', 'BLT', 'LAINNYA'] as const;
+
+export const BPJS_OPTIONS = ['TIDAK', 'BPI', 'MANDIRI', 'KETENAGAKERJAAN'] as const;
+
+export const STATUS_KTP = ['PUNYA', 'BELUM'] as const;
+
+export const JENIS_KEJADIAN = ['LAHIR', 'MATI', 'PINDAH', 'DATANG'] as const;
+
+export const STATUS_KETERANGAN_SEMENTARA = ['KONTRAK', 'SEWA', 'MENUMPANG', 'KOS', 'NUMPANG KELUARGA'] as const;
+
+export const BULAN = [
+  'JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI',
+  'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER',
+] as const;
