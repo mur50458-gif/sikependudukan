@@ -100,9 +100,10 @@ export async function POST(request: NextRequest) {
           const month = parseInt(parts[0]) - 1;
           const day = parseInt(parts[1]);
           let year = parseInt(parts[2]);
-          // Convert 2-digit year: if > 50 assume 1900s, else 2000s
+          // Convert 2-digit year: if > current century's 2-digit year assume 1900s
           if (year < 100) {
-            year = year > 50 ? 1900 + year : 2000 + year;
+            const currentCentury2Digit = new Date().getFullYear() % 100;
+            year = year > currentCentury2Digit ? 1900 + year : 2000 + year;
           }
           const date = new Date(year, month, day);
           tanggalLahirStr = date.toISOString().split('T')[0];

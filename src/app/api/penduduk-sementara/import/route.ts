@@ -101,7 +101,8 @@ export async function POST(request: NextRequest) {
           const day = parseInt(parts[1]);
           let year = parseInt(parts[2]);
           if (year < 100) {
-            year = year > 50 ? 1900 + year : 2000 + year;
+            const currentCentury2Digit = new Date().getFullYear() % 100;
+            year = year > currentCentury2Digit ? 1900 + year : 2000 + year;
           }
           const date = new Date(year, month, day);
           if (!isNaN(date.getTime())) {
