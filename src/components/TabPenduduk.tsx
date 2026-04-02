@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Search, FileUp, Pencil, Trash2, ChevronDown, ChevronRight, Users } from 'lucide-react';
+import { Plus, Search, FileUp, Pencil, Trash2, ChevronDown, ChevronRight, Users, Filter, Vote, Heart, ShieldCheck, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AGAMA, PENDIDIKAN, PEKERJAAN, STATUS_PERKAWINAN, BANTUAN_OPTIONS,
@@ -97,23 +97,31 @@ interface TabPendudukProps {
   isAdmin?: boolean;
 }
 
+type FilterType = 'SEMUA' | 'DPT' | 'BANTUAN' | 'BPJS' | 'USIA_75+';
+
+const FILTER_OPTIONS: { key: FilterType; label: string; icon: typeof Users }[] = [
+  { key: 'SEMUA', label: 'Semua', icon: Users },
+  { key: 'DPT', label: 'DPT', icon: Vote },
+  { key: 'BANTUAN', label: 'Bantuan', icon: Heart },
+  { key: 'BPJS', label: 'BPJS', icon: ShieldCheck },
+  { key: 'USIA_75+', label: '75+', icon: Clock },
+];
+
 export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
   const [penduduk, setPenduduk] = useState<Penduduk[]>([]);
   const [kkGroups, setKKGroups] = useState<KKGroup[]>([]);
   const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<FilterType>('SEMUA');
   const [loading, setLoading] = useState(true);
   const [expandedKK, setExpandedKK] = useState<Set<string>>(new Set());
 
-  // Form
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState(defaultFormData);
   const [formError, setFormError] = useState('');
 
-  // Delete
   const [deleteTarget, setDeleteTarget] = useState<Penduduk | null>(null);
 
-  // Import
   const [showImport, setShowImport] = useState(false);
   const [importing, setImporting] = useState(false);
 
@@ -133,6 +141,29 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
     }
   }, [search]);
 
+  const matchFilter = (p: Penduduk): boolean => {
+    switch (activeFilter) {
+      case 'DPT': {
+        const umur = hitungUmur(p.tanggalLahir);
+        return umur.umurTahun >= 17;
+      }
+      case 'BANTUAN': {
+        try {
+          const arr = JSON.parse(p.bantuan || '[]');
+          return arr.some((b: string) => b && b !== 'TIDAK' && b !== '');
+        } catch { return false; }
+      }
+      case 'BPJS':
+        return !!p.bpjs && p.bpjs !== 'TIDAK' && p.bpjs !== '';
+      case 'USIA_75+': {
+        const umur = hitungUmur(p.tanggalLahir);
+        return umur.umurTahun >= 75;
+      }
+      default:
+        return true;
+    }
+  };
+
   const groupByKK = (data: Penduduk[]) => {
     const map = new Map<string, KKGroup>();
     for (const p of data) {
@@ -147,12 +178,37 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
         group.anggota.push(p);
       }
     }
-    setKKGroups(Array.from(map.values()));
+    const allGroups = Array.from(map.values());
+    if (activeFilter === 'SEMUA') {
+      setKKGroups(allGroups);
+    } else {
+      const filtered = allGroups.filter(g => {
+        const members = g.kepala ? [g.kepala, ...g.anggota] : g.anggota;
+        return members.some(matchFilter);
+      }).map(g => {
+        if (g.kepala && !matchFilter(g.kepala)) {
+          const filteredAnggota = g.anggota.filter(matchFilter);
+          return { ...g, kepala: null as unknown as Penduduk, anggota: filteredAnggota };
+        }
+        return { ...g, anggota: g.anggota.filter(matchFilter) };
+      });
+      setKKGroups(filtered);
+    }
   };
+
+  const filteredCount = activeFilter === 'SEMUA'
+    ? penduduk.length
+    : penduduk.filter(matchFilter).length;
 
   useEffect(() => {
     fetchPenduduk();
   }, [fetchPenduduk]);
+
+  useEffect(() => {
+    if (penduduk.length > 0) {
+      groupByKK(penduduk);
+    }
+  }, [activeFilter]);
 
   const openAddForm = (noKK?: string) => {
     setEditingId(null);
@@ -306,12 +362,11 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-emerald-600" />
           <h2 className="text-lg font-bold text-emerald-800">Data Penduduk</h2>
-          <Badge variant="secondary" className="text-xs">{penduduk.length} orang</Badge>
+          <Badge variant="secondary" className="text-xs">{filteredCount} orang</Badge>
         </div>
         <div className="flex gap-2">
           {isAdmin && (
@@ -327,7 +382,32 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Filter Tabs */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {FILTER_OPTIONS.map(f => {
+          const Icon = f.icon;
+          const isActive = activeFilter === f.key;
+          const count = f.key === 'SEMUA' ? penduduk.length : penduduk.filter(matchFilter).length;
+          return (
+            <button
+              key={f.key}
+              onClick={() => setActiveFilter(f.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                isActive
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span>{f.label}</span>
+              <span className={`px-1.5 py-0 rounded-full text-[10px] ${
+                isActive ? 'bg-white/20' : 'bg-gray-200'
+              }`}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -338,7 +418,6 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
         />
       </div>
 
-      {/* KK List */}
       <ScrollArea className="max-h-[calc(100vh-260px)]">
         <div className="space-y-2">
           {kkGroups.map(group => {
@@ -349,7 +428,6 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
             return (
               <Card key={group.noKK} className="overflow-hidden">
                 <CardContent className="p-0">
-                  {/* KK Header */}
                   <button
                     onClick={() => toggleExpand(group.noKK)}
                     className="w-full flex items-center gap-2 p-3 hover:bg-emerald-50 transition-colors text-left"
@@ -369,10 +447,8 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
                     </div>
                   </button>
 
-                  {/* Expanded Members */}
                   {isExpanded && (
                     <div className="border-t border-gray-100 bg-gray-50/50">
-                      {/* Kepala Keluarga */}
                       {group.kepala && (
                         <PendudukRow
                           penduduk={group.kepala}
@@ -383,7 +459,6 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
                           onAddMember={() => openAddForm(group.noKK)}
                         />
                       )}
-                      {/* Anggota */}
                       {group.anggota.map(a => (
                         <PendudukRow
                           key={a.id}
@@ -409,7 +484,6 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
         </div>
       </ScrollArea>
 
-      {/* Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -639,7 +713,6 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Import Dialog */}
       <Dialog open={showImport} onOpenChange={setShowImport}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -665,7 +738,6 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
