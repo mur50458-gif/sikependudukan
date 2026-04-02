@@ -19,6 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -31,7 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, CalendarDays, UserPlus, Home } from 'lucide-react';
+import { Plus, Pencil, Trash2, CalendarDays, UserPlus, Home, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   JENIS_KEJADIAN, AGAMA, PENDIDIKAN, PEKERJAAN,
@@ -124,12 +126,11 @@ export default function TabKejadian({ isAdmin = true }: TabKejadianProps) {
   const [loading, setLoading] = useState(true);
   const [kkOptions, setKKOptions] = useState<KKOption[]>([]);
   const [allPenduduk, setAllPenduduk] = useState<PendudukItem[]>([]);
-
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState<FormKejadian>(defaultForm);
   const [formError, setFormError] = useState('');
-
+  const [kkOpen, setKkOpen] = useState(false);
   const [modeDatang, setModeDatang] = useState<'EKSISTING' | 'BARU'>('EKSISTING');
   const [deleteTarget, setDeleteTarget] = useState<Kejadian | null>(null);
 
@@ -168,7 +169,6 @@ export default function TabKejadian({ isAdmin = true }: TabKejadianProps) {
   useEffect(() => { fetchKKOptions(); }, [fetchKKOptions]);
   useEffect(() => { setLoading(true); fetchData(); }, [fetchData]);
 
-  // Anggota KK yang dipilih (untuk MATI/PINDAH)
   const kkMembers = allPenduduk.filter(p => p.noKK === formData.noKK);
 
   const isDatang = formData.jenisKejadian === 'DATANG';
@@ -243,75 +243,30 @@ export default function TabKejadian({ isAdmin = true }: TabKejadianProps) {
 
   const handleSubmit = async () => {
     setFormError('');
-
-    // Validasi umum
     if (!formData.namaLengkap || !formData.tanggal) {
       setFormError('Data wajib belum lengkap');
       return;
     }
-
-    // Validasi MATI/PINDAH: NIK wajib
     if (isMatiOrPindah) {
-      if (!formData.noKK) {
-        setFormError('Pilih No. KK');
-        return;
-      }
-      if (!formData.nik) {
-        setFormError('Pilih penduduk atau masukkan NIK');
-        return;
-      }
+      if (!formData.noKK) { setFormError('Pilih No. KK'); return; }
+      if (!formData.nik) { setFormError('Pilih penduduk atau masukkan NIK'); return; }
     }
-
-    // Validasi LAHIR
     if (isLahir && !editingId) {
-      if (!formData.noKK) {
-        setFormError('No. KK wajib diisi');
-        return;
-      }
-      if (!formData.tanggalLahir) {
-        setFormError('Tanggal lahir wajib diisi');
-        return;
-      }
-      if (!formData.jenisKelamin) {
-        setFormError('Jenis kelamin wajib diisi');
-        return;
-      }
+      if (!formData.noKK) { setFormError('No. KK wajib diisi'); return; }
+      if (!formData.tanggalLahir) { setFormError('Tanggal lahir wajib diisi'); return; }
+      if (!formData.jenisKelamin) { setFormError('Jenis kelamin wajib diisi'); return; }
     }
-
-    // Validasi DATANG
     if (isDatang && !editingId) {
-      if (!formData.noKK) {
-        setFormError('No. KK wajib diisi untuk kejadian DATANG');
-        return;
-      }
-      if (modeDatang === 'BARU' && formData.noKK.length !== 16) {
-        setFormError('No. KK baru harus 16 digit angka');
-        return;
-      }
-      if (formData.nik && formData.nik.length !== 16) {
-        setFormError('NIK harus 16 digit angka');
-        return;
-      }
-      if (!formData.tanggalLahir) {
-        setFormError('Tanggal lahir wajib diisi untuk menambah anggota keluarga');
-        return;
-      }
-      if (!formData.jenisKelamin) {
-        setFormError('Jenis kelamin wajib diisi');
-        return;
-      }
-      if (!formData.statusKeluarga) {
-        setFormError('Status keluarga wajib diisi');
-        return;
-      }
+      if (!formData.noKK) { setFormError('No. KK wajib diisi untuk kejadian DATANG'); return; }
+      if (modeDatang === 'BARU' && formData.noKK.length !== 16) { setFormError('No. KK baru harus 16 digit angka'); return; }
+      if (formData.nik && formData.nik.length !== 16) { setFormError('NIK harus 16 digit angka'); return; }
+      if (!formData.tanggalLahir) { setFormError('Tanggal lahir wajib diisi untuk menambah anggota keluarga'); return; }
+      if (!formData.jenisKelamin) { setFormError('Jenis kelamin wajib diisi'); return; }
+      if (!formData.statusKeluarga) { setFormError('Status keluarga wajib diisi'); return; }
     }
-
     try {
       const method = editingId ? 'PUT' : 'POST';
-      const body = editingId
-        ? { id: editingId, ...formData }
-        : { ...formData, modeDatang };
-
+      const body = editingId ? { id: editingId, ...formData } : { ...formData, modeDatang };
       const res = await fetch('/api/kejadian', {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -319,7 +274,6 @@ export default function TabKejadian({ isAdmin = true }: TabKejadianProps) {
       });
       if (res.ok) {
         const result = await res.json();
-
         if (result.pendudukAdded && isLahir) {
           toast.success('Kejadian LAHIR ditambahkan & penduduk baru disimpan');
         } else if (result.pendudukAdded && isDatang) {
@@ -394,7 +348,6 @@ export default function TabKejadian({ isAdmin = true }: TabKejadianProps) {
         )}
       </div>
 
-      {/* Sub-tabs */}
       <div className="grid grid-cols-4 gap-2">
         {JENIS_KEJADIAN.map(type => (
           <button
@@ -411,14 +364,12 @@ export default function TabKejadian({ isAdmin = true }: TabKejadianProps) {
         ))}
       </div>
 
-      {/* Count */}
       <div className="flex gap-3 justify-center text-sm">
         <Badge variant="outline" className="text-xs px-3 py-1">Total: {filteredKejadian.length}</Badge>
         <Badge variant="outline" className="text-xs px-3 py-1">L: {countL}</Badge>
         <Badge variant="outline" className="text-xs px-3 py-1">P: {countP}</Badge>
       </div>
 
-      {/* List */}
       <ScrollArea className="max-h-[calc(100vh-320px)]">
         <div className="space-y-2">
           {filteredKejadian.map(k => (
@@ -459,7 +410,6 @@ export default function TabKejadian({ isAdmin = true }: TabKejadianProps) {
         </div>
       </ScrollArea>
 
-      {/* Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -484,86 +434,94 @@ export default function TabKejadian({ isAdmin = true }: TabKejadianProps) {
               </Select>
             </div>
 
-            {/* ============ NO. KK ============ */}
             {isDatang && !editingId ? (
               <>
                 <div className="space-y-1">
                   <Label className="text-xs">Gabung ke KK</Label>
                   <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleModeDatang('EKSISTING')}
-                      className={`flex items-center justify-center gap-1.5 rounded-lg border-2 p-2.5 text-xs font-semibold transition-all ${
-                        modeDatang === 'EKSISTING'
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
-                      }`}
-                    >
-                      <UserPlus className="h-3.5 w-3.5" />
-                      {'KK Eksisting'}
+                    <button type="button" onClick={() => handleModeDatang('EKSISTING')}
+                      className={`flex items-center justify-center gap-1.5 rounded-lg border-2 p-2.5 text-xs font-semibold transition-all ${modeDatang === 'EKSISTING' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'}`}>
+                      <UserPlus className="h-3.5 w-3.5" /> KK Eksisting
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleModeDatang('BARU')}
-                      className={`flex items-center justify-center gap-1.5 rounded-lg border-2 p-2.5 text-xs font-semibold transition-all ${
-                        modeDatang === 'BARU'
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
-                      }`}
-                    >
-                      <Home className="h-3.5 w-3.5" />
-                      {'KK Baru'}
+                    <button type="button" onClick={() => handleModeDatang('BARU')}
+                      className={`flex items-center justify-center gap-1.5 rounded-lg border-2 p-2.5 text-xs font-semibold transition-all ${modeDatang === 'BARU' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'}`}>
+                      <Home className="h-3.5 w-3.5" /> KK Baru
                     </button>
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">No. KK *</Label>
                   {modeDatang === 'EKSISTING' ? (
-                    <Select value={formData.noKK} onValueChange={v => setFormData({ ...formData, noKK: v })}>
-                      <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih KK tujuan" /></SelectTrigger>
-                      <SelectContent>
-                        {kkOptions.map(kk => (
-                          <SelectItem key={kk.noKK} value={kk.noKK}>{kk.noKK} - {kk.namaKepala}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={kkOpen} onOpenChange={setKkOpen}>
+                      <PopoverTrigger asChild>
+                        <div className="relative">
+                          <Input className="text-sm pr-8" placeholder="Ketik atau pilih No. KK" value={formData.noKK}
+                            onChange={e => { setFormData({ ...formData, noKK: e.target.value.replace(/[^0-9]/g, '').slice(0, 16) }); setKkOpen(true); }}
+                            onFocus={() => setKkOpen(true)} />
+                          <ChevronsUpDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50" />
+                        </div>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                        <Command shouldFilter={false}>
+                          <CommandInput placeholder="Cari KK..." />
+                          <CommandList className="max-h-[200px]">
+                            <CommandEmpty>KK tidak ditemukan</CommandEmpty>
+                            <CommandGroup>
+                              {kkOptions.filter(kk => kk.noKK.includes(formData.noKK) || kk.namaKepala.toLowerCase().includes(formData.noKK.toLowerCase())).map(kk => (
+                                <CommandItem key={kk.noKK} value={kk.noKK} onSelect={() => { setFormData({ ...formData, noKK: kk.noKK }); setKkOpen(false); }}>
+                                  <span className="font-mono text-xs">{kk.noKK}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">{kk.namaKepala}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   ) : (
-                    <Input
-                      className="text-sm"
-                      placeholder="Masukkan 16 digit No. KK baru"
-                      value={formData.noKK}
-                      onChange={e => setFormData({ ...formData, noKK: e.target.value.replace(/[^0-9]/g, '').slice(0, 16) })}
-                      maxLength={16}
-                    />
+                    <Input className="text-sm" placeholder="Masukkan 16 digit No. KK baru" value={formData.noKK}
+                      onChange={e => setFormData({ ...formData, noKK: e.target.value.replace(/[^0-9]/g, '').slice(0, 16) })} maxLength={16} />
                   )}
                 </div>
               </>
             ) : (
               <div className="space-y-1">
                 <Label className="text-xs">No. KK</Label>
-                <Select value={formData.noKK} onValueChange={v => setFormData({ ...formData, noKK: v })}>
-                  <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih KK" /></SelectTrigger>
-                  <SelectContent>
-                    {kkOptions.map(kk => (
-                      <SelectItem key={kk.noKK} value={kk.noKK}>{kk.noKK} - {kk.namaKepala}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={kkOpen} onOpenChange={setKkOpen}>
+                  <PopoverTrigger asChild>
+                    <div className="relative">
+                      <Input className="text-sm pr-8" placeholder="Ketik atau pilih No. KK" value={formData.noKK}
+                        onChange={e => { setFormData({ ...formData, noKK: e.target.value.replace(/[^0-9]/g, '').slice(0, 16) }); setKkOpen(true); }}
+                        onFocus={() => setKkOpen(true)} />
+                      <ChevronsUpDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50" />
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput placeholder="Cari KK..." />
+                      <CommandList className="max-h-[200px]">
+                        <CommandEmpty>KK tidak ditemukan</CommandEmpty>
+                        <CommandGroup>
+                          {kkOptions.filter(kk => kk.noKK.includes(formData.noKK) || kk.namaKepala.toLowerCase().includes(formData.noKK.toLowerCase())).map(kk => (
+                            <CommandItem key={kk.noKK} value={kk.noKK} onSelect={() => { setFormData({ ...formData, noKK: kk.noKK }); setKkOpen(false); }}>
+                              <span className="font-mono text-xs">{kk.noKK}</span>
+                              <span className="ml-2 text-xs text-muted-foreground">{kk.namaKepala}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
 
-            {/* ============ MATI / PINDAH: Pilih Penduduk ============ */}
             {isMatiOrPindah && !editingId && (
               <>
                 <div className="space-y-1">
                   <Label className="text-xs">Pilih Penduduk</Label>
-                  <Select
-                    value={formData.nik}
-                    onValueChange={v => handleSelectMember(v)}
-                  >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue placeholder={kkMembers.length > 0 ? 'Pilih anggota KK...' : 'Pilih KK terlebih dahulu'} />
-                    </SelectTrigger>
+                  <Select value={formData.nik} onValueChange={v => handleSelectMember(v)}>
+                    <SelectTrigger className="text-sm"><SelectValue placeholder={kkMembers.length > 0 ? 'Pilih anggota KK...' : 'Pilih KK terlebih dahulu'} /></SelectTrigger>
                     <SelectContent>
                       {kkMembers.map(m => (
                         <SelectItem key={m.nik} value={m.nik}>
@@ -573,230 +531,85 @@ export default function TabKejadian({ isAdmin = true }: TabKejadianProps) {
                     </SelectContent>
                   </Select>
                 </div>
-
                 {formData.nik && (
                   <div className="bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-800">
-                    <p className="font-semibold">
-                      ⚠️ Penduduk akan dihapus dari data KK
-                    </p>
-                    <p className="mt-0.5">
-                      {formData.namaLengkap} ({formData.jenisKelamin === 'LAKI-LAKI' ? 'L' : 'P'}) — NIK: {formData.nik}
-                    </p>
+                    <p className="font-semibold">⚠️ Penduduk akan dihapus dari data KK</p>
+                    <p className="mt-0.5">{formData.namaLengkap} ({formData.jenisKelamin === 'LAKI-LAKI' ? 'L' : 'P'}) — NIK: {formData.nik}</p>
                   </div>
                 )}
-
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Nama</Label>
-                    <Input className="text-sm bg-gray-50" value={formData.namaLengkap} disabled />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">NIK</Label>
-                    <Input className="text-sm bg-gray-50" value={formData.nik} disabled />
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Nama</Label><Input className="text-sm bg-gray-50" value={formData.namaLengkap} disabled /></div>
+                  <div className="space-y-1"><Label className="text-xs">NIK</Label><Input className="text-sm bg-gray-50" value={formData.nik} disabled /></div>
                 </div>
               </>
             )}
 
-            {/* ============ LAHIR/DATANG: Form Anggota Keluarga ============ */}
             {showFamilyForm && (
               <>
-                <div className="space-y-1">
-                  <Label className="text-xs">Nama Lengkap *</Label>
-                  <Input
-                    className="text-sm uppercase"
-                    value={formData.namaLengkap}
-                    onChange={e => setFormData({ ...formData, namaLengkap: e.target.value.toUpperCase() })}
-                  />
-                </div>
-
+                <div className="space-y-1"><Label className="text-xs">Nama Lengkap *</Label><Input className="text-sm uppercase" value={formData.namaLengkap} onChange={e => setFormData({ ...formData, namaLengkap: e.target.value.toUpperCase() })} /></div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">NIK {isDatang ? '*' : ''}</Label>
-                    <Input
-                      className="text-sm"
-                      value={formData.nik}
-                      onChange={e => setFormData({ ...formData, nik: e.target.value })}
-                      placeholder={isDatang ? '16 digit angka' : 'Opsional (belum ada NIK)'}
-                      maxLength={16}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Jenis Kelamin *</Label>
-                    <Select value={formData.jenisKelamin} onValueChange={v => setFormData({ ...formData, jenisKelamin: v })}>
-                      <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
-                      <SelectContent>
-                        {JENIS_KELAMIN.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">NIK {isDatang ? '*' : ''}</Label><Input className="text-sm" value={formData.nik} onChange={e => setFormData({ ...formData, nik: e.target.value })} placeholder={isDatang ? '16 digit angka' : 'Opsional (belum ada NIK)'} maxLength={16} /></div>
+                  <div className="space-y-1"><Label className="text-xs">Jenis Kelamin *</Label><Select value={formData.jenisKelamin} onValueChange={v => setFormData({ ...formData, jenisKelamin: v })}><SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger><SelectContent>{JENIS_KELAMIN.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}</SelectContent></Select></div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Status Keluarga</Label>
-                    {isLahir ? (
-                      <Input className="text-sm bg-gray-50" value="ANAK" disabled />
-                    ) : modeDatang === 'BARU' ? (
-                      <Input className="text-sm bg-gray-50" value="KEPALA KELUARGA" disabled />
-                    ) : (
-                      <Select value={formData.statusKeluarga} onValueChange={v => updateField('statusKeluarga', v)}>
-                        <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
-                        <SelectContent>
-                          {STATUS_ANGGOTA.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                  <div className="space-y-1"><Label className="text-xs">Status Keluarga</Label>
+                    {isLahir ? (<Input className="text-sm bg-gray-50" value="ANAK" disabled />) : modeDatang === 'BARU' ? (<Input className="text-sm bg-gray-50" value="KEPALA KELUARGA" disabled />) : (
+                      <Select value={formData.statusKeluarga} onValueChange={v => updateField('statusKeluarga', v)}><SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger><SelectContent>{STATUS_ANGGOTA.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
                     )}
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Status Perkawinan</Label>
-                    <Select value={formData.statusPerkawinan} onValueChange={v => updateField('statusPerkawinan', v)}>
-                      <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
-                      <SelectContent>
-                        {STATUS_PERKAWINAN.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Status Perkawinan</Label><Select value={formData.statusPerkawinan} onValueChange={v => updateField('statusPerkawinan', v)}><SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger><SelectContent>{STATUS_PERKAWINAN.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Tempat Lahir</Label>
-                    <Input className="text-sm uppercase" value={formData.tempatLahir} onChange={e => updateField('tempatLahir', e.target.value.toUpperCase())} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Tanggal Lahir *</Label>
-                    <Input type="date" className="text-sm" value={formData.tanggalLahir} onChange={e => updateField('tanggalLahir', e.target.value)} />
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Tempat Lahir</Label><Input className="text-sm uppercase" value={formData.tempatLahir} onChange={e => updateField('tempatLahir', e.target.value.toUpperCase())} /></div>
+                  <div className="space-y-1"><Label className="text-xs">Tanggal Lahir *</Label><Input type="date" className="text-sm" value={formData.tanggalLahir} onChange={e => updateField('tanggalLahir', e.target.value)} /></div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Agama</Label>
-                    <Select value={formData.agama} onValueChange={v => updateField('agama', v)}>
-                      <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
-                      <SelectContent>
-                        {AGAMA.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Pendidikan</Label>
-                    <Select value={formData.pendidikan} onValueChange={v => updateField('pendidikan', v)}>
-                      <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
-                      <SelectContent>
-                        {PENDIDIKAN.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Agama</Label><Select value={formData.agama} onValueChange={v => updateField('agama', v)}><SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger><SelectContent>{AGAMA.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="space-y-1"><Label className="text-xs">Pendidikan</Label><Select value={formData.pendidikan} onValueChange={v => updateField('pendidikan', v)}><SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger><SelectContent>{PENDIDIKAN.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Pekerjaan</Label>
-                    <Select value={formData.pekerjaan} onValueChange={v => updateField('pekerjaan', v)}>
-                      <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
-                      <SelectContent>
-                        {PEKERJAAN.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Kewarganegaraan</Label>
-                    <Input className="text-sm uppercase" value={formData.kewarganegaraan} onChange={e => updateField('kewarganegaraan', e.target.value.toUpperCase())} />
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Pekerjaan</Label><Select value={formData.pekerjaan} onValueChange={v => updateField('pekerjaan', v)}><SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger><SelectContent>{PEKERJAAN.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="space-y-1"><Label className="text-xs">Kewarganegaraan</Label><Input className="text-sm uppercase" value={formData.kewarganegaraan} onChange={e => updateField('kewarganegaraan', e.target.value.toUpperCase())} /></div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Nama Ayah</Label>
-                    <Input className="text-sm uppercase" value={formData.namaAyah} onChange={e => updateField('namaAyah', e.target.value.toUpperCase())} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Nama Ibu</Label>
-                    <Input className="text-sm uppercase" value={formData.namaIbu} onChange={e => updateField('namaIbu', e.target.value.toUpperCase())} />
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Nama Ayah</Label><Input className="text-sm uppercase" value={formData.namaAyah} onChange={e => updateField('namaAyah', e.target.value.toUpperCase())} /></div>
+                  <div className="space-y-1"><Label className="text-xs">Nama Ibu</Label><Input className="text-sm uppercase" value={formData.namaIbu} onChange={e => updateField('namaIbu', e.target.value.toUpperCase())} /></div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Nama Panggilan</Label>
-                    <Input className="text-sm uppercase" value={formData.namaPanggilan} onChange={e => updateField('namaPanggilan', e.target.value.toUpperCase())} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">No. HP</Label>
-                    <Input className="text-sm" value={formData.noHP} onChange={e => updateField('noHP', e.target.value)} />
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Nama Panggilan</Label><Input className="text-sm uppercase" value={formData.namaPanggilan} onChange={e => updateField('namaPanggilan', e.target.value.toUpperCase())} /></div>
+                  <div className="space-y-1"><Label className="text-xs">No. HP</Label><Input className="text-sm" value={formData.noHP} onChange={e => updateField('noHP', e.target.value)} /></div>
                 </div>
-
                 {isDatang && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Status KTP</Label>
-                    <Select value={formData.punyaKTP} onValueChange={v => updateField('punyaKTP', v)}>
-                      <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {STATUS_KTP.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Status KTP</Label><Select value={formData.punyaKTP} onValueChange={v => updateField('punyaKTP', v)}><SelectTrigger className="text-sm"><SelectValue /></SelectTrigger><SelectContent>{STATUS_KTP.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
                 )}
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Bantuan Sosial</Label>
+                <div className="space-y-1"><Label className="text-xs">Bantuan Sosial</Label>
                   <div className="flex flex-wrap gap-2">
                     {BANTUAN_OPTIONS.map(b => (
                       <label key={b} className="flex items-center gap-1.5 cursor-pointer">
-                        <Checkbox
-                          checked={formData.bantuan.includes(b)}
-                          onCheckedChange={() => toggleBantuan(b)}
-                        />
+                        <Checkbox checked={formData.bantuan.includes(b)} onCheckedChange={() => toggleBantuan(b)} />
                         <span className="text-xs">{b}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-
-                {/* DATANG: Info mode */}
                 {isDatang && (
                   <div className="border-t border-blue-200 pt-3 mt-1">
                     <div className="flex items-center gap-2 mb-2">
-                      {modeDatang === 'BARU' ? (
-                        <Home className="h-4 w-4 text-emerald-600" />
-                      ) : (
-                        <UserPlus className="h-4 w-4 text-blue-600" />
-                      )}
+                      {modeDatang === 'BARU' ? <Home className="h-4 w-4 text-emerald-600" /> : <UserPlus className="h-4 w-4 text-blue-600" />}
                       <span className={`text-sm font-semibold ${modeDatang === 'BARU' ? 'text-emerald-700' : 'text-blue-700'}`}>
                         {modeDatang === 'BARU' ? 'Buat KK Baru (Kepala Keluarga)' : 'Tambah sebagai Anggota Keluarga'}
                       </span>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      {modeDatang === 'BARU'
-                        ? 'Orang ini akan didaftarkan sebagai Kepala Keluarga baru di wilayah RT.'
-                        : 'Data berikut akan disimpan sebagai anggota keluarga baru pada KK yang dipilih.'}
+                      {modeDatang === 'BARU' ? 'Orang ini akan didaftarkan sebagai Kepala Keluarga baru di wilayah RT.' : 'Data berikut akan disimpan sebagai anggota keluarga baru pada KK yang dipilih.'}
                     </p>
                   </div>
                 )}
               </>
             )}
 
-            <div className="space-y-1">
-              <Label className="text-xs">Tanggal Kejadian *</Label>
-              <Input
-                type="date"
-                className="text-sm"
-                value={formData.tanggal}
-                onChange={e => setFormData({ ...formData, tanggal: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Keterangan</Label>
-              <Input
-                className="text-sm"
-                value={formData.keterangan}
-                onChange={e => setFormData({ ...formData, keterangan: e.target.value })}
-              />
-            </div>
+            <div className="space-y-1"><Label className="text-xs">Tanggal Kejadian *</Label><Input type="date" className="text-sm" value={formData.tanggal} onChange={e => setFormData({ ...formData, tanggal: e.target.value })} /></div>
+            <div className="space-y-1"><Label className="text-xs">Keterangan</Label><Input className="text-sm" value={formData.keterangan} onChange={e => setFormData({ ...formData, keterangan: e.target.value })} /></div>
 
             <div className="flex gap-2 pt-2">
               <Button onClick={handleSubmit} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
@@ -808,7 +621,6 @@ export default function TabKejadian({ isAdmin = true }: TabKejadianProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
