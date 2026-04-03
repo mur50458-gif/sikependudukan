@@ -18,8 +18,8 @@ export const metadata: Metadata = {
     title: "Sikependudukan",
   },
   icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/icon-192.png",
+    icon: "/logo.png",
+    apple: "/logo.png",
   },
 };
 
@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" href="/logo.png" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
