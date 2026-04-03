@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Search, FileUp, Pencil, Trash2, ChevronDown, ChevronRight, Users, Filter } from 'lucide-react';
+import { Plus, Search, FileUp, Pencil, Trash2, ChevronDown, ChevronRight, ChevronUp, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AGAMA, PENDIDIKAN, PEKERJAAN, STATUS_PERKAWINAN, BANTUAN_OPTIONS,
@@ -97,21 +97,10 @@ interface TabPendudukProps {
   isAdmin?: boolean;
 }
 
-type FilterType = 'SEMUA' | 'DPT' | 'BANTUAN' | 'BPJS' | 'USIA_75+';
-
-const FILTER_LABELS: Record<FilterType, string> = {
-  SEMUA: 'Semua',
-  DPT: 'DPT (Usia ≥ 17)',
-  BANTUAN: 'Bantuan',
-  BPJS: 'BPJS',
-  'USIA_75+': 'Usia 75+',
-};
-
 export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
   const [penduduk, setPenduduk] = useState<Penduduk[]>([]);
   const [kkGroups, setKKGroups] = useState<KKGroup[]>([]);
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>('SEMUA');
   const [loading, setLoading] = useState(true);
   const [expandedKK, setExpandedKK] = useState<Set<string>>(new Set());
 
@@ -127,6 +116,30 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
   // Import
   const [showImport, setShowImport] = useState(false);
   const [importing, setImporting] = useState(false);
+
+  // Add menu
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+  const [addMode, setAddMode] = useState<'KK_BARU' | 'ANGGOTA'>('KK_BARU');
+
+  // Anggota list for KK_BARU mode
+  const [anggotaList, setAnggotaList] = useState<typeof defaultFormData[]>([]);
+  const [expandedAnggota, setExpandedAnggota] = useState<Set<number>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+
+  // KK options for anggota mode
+  const kkList = kkGroups.map(g => ({ noKK: g.noKK, namaKepala: g.kepala?.namaLengkap || '-' }));
+
+  useEffect(() => {
+    if (!showAddMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showAddMenu]);
 
   const fetchPenduduk = useCallback(async () => {
     try {
@@ -144,29 +157,6 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
     }
   }, [search]);
 
-  const matchFilter = (p: Penduduk): boolean => {
-    switch (activeFilter) {
-      case 'DPT': {
-        const umur = hitungUmur(p.tanggalLahir);
-        return umur.umurTahun >= 17;
-      }
-      case 'BANTUAN': {
-        try {
-          const arr = JSON.parse(p.bantuan || '[]');
-          return arr.some((b: string) => b && b !== 'TIDAK' && b !== '');
-        } catch { return false; }
-      }
-      case 'BPJS':
-        return !!p.bpjs && p.bpjs !== 'TIDAK' && p.bpjs !== '';
-      case 'USIA_75+': {
-        const umur = hitungUmur(p.tanggalLahir);
-        return umur.umurTahun >= 75;
-      }
-      default:
-        return true;
-    }
-  };
-
   const groupByKK = (data: Penduduk[]) => {
     const map = new Map<string, KKGroup>();
     for (const p of data) {
@@ -181,48 +171,78 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
         group.anggota.push(p);
       }
     }
-    const allGroups = Array.from(map.values());
-    if (activeFilter === 'SEMUA') {
-      setKKGroups(allGroups);
-    } else {
-      const filtered = allGroups.filter(g => {
-        const members = g.kepala ? [g.kepala, ...g.anggota] : g.anggota;
-        return members.some(matchFilter);
-      }).map(g => {
-        if (g.kepala && !matchFilter(g.kepala)) {
-          const filteredAnggota = g.anggota.filter(matchFilter);
-          return { ...g, kepala: null as unknown as Penduduk, anggota: filteredAnggota };
-        }
-        return { ...g, anggota: g.anggota.filter(matchFilter) };
-      });
-      setKKGroups(filtered);
-    }
+    setKKGroups(Array.from(map.values()));
   };
-
-  const filteredCount = activeFilter === 'SEMUA'
-    ? penduduk.length
-    : penduduk.filter(matchFilter).length;
 
   useEffect(() => {
     fetchPenduduk();
   }, [fetchPenduduk]);
 
-  // Re-group when filter changes
-  useEffect(() => {
-    if (penduduk.length > 0) {
-      groupByKK(penduduk);
-    }
-  }, [activeFilter]);
-
-  const openAddForm = (noKK?: string) => {
+  const openAddForm = (noKK?: string, isAnggota?: boolean) => {
     setEditingId(null);
     setFormError('');
+    setShowAddMenu(false);
+    setAddMode(isAnggota ? 'ANGGOTA' : 'KK_BARU');
     setFormData({
       ...defaultFormData,
       noKK: noKK || '',
       bantuan: [],
+      statusKeluarga: isAnggota ? '' : 'KEPALA KELUARGA',
     });
+    setAnggotaList([]);
+    setExpandedAnggota(new Set());
     setShowForm(true);
+  };
+
+  const addAnggota = () => {
+    setAnggotaList(prev => [...prev, {
+      ...defaultFormData,
+      noKK: formData.noKK || '',
+      statusKeluarga: '',
+      bantuan: [],
+      kewarganegaraan: formData.kewarganegaraan || 'WNI',
+      namaAyah: formData.namaAyah || '',
+      namaIbu: formData.namaIbu || '',
+    }]);
+    setExpandedAnggota(prev => new Set([...prev, anggotaList.length]));
+  };
+
+  const removeAnggota = (index: number) => {
+    setAnggotaList(prev => prev.filter((_, i) => i !== index));
+    setExpandedAnggota(prev => {
+      const next = new Set<number>();
+      for (const v of prev) {
+        if (v === index) continue;
+        if (v > index) next.add(v - 1);
+        else next.add(v);
+      }
+      return next;
+    });
+  };
+
+  const updateAnggotaField = (index: number, field: string, value: string | string[]) => {
+    setAnggotaList(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  };
+
+  const toggleAnggotaExpand = (index: number) => {
+    setExpandedAnggota(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const toggleAnggotaBantuan = (index: number, item: string) => {
+    setAnggotaList(prev => prev.map((a, i) => {
+      if (i !== index) return a;
+      return {
+        ...a,
+        bantuan: a.bantuan.includes(item)
+          ? a.bantuan.filter(b => b !== item)
+          : [...a.bantuan, item],
+      };
+    }));
   };
 
   const openEditForm = (p: Penduduk) => {
@@ -255,41 +275,141 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
 
   const handleSubmit = async () => {
     setFormError('');
-
-    if (!validateNoKK(formData.noKK)) {
-      setFormError('No. KK harus 16 digit angka');
-      return;
-    }
-    if (!validateNIK(formData.nik)) {
-      setFormError('NIK harus 16 digit angka');
-      return;
-    }
-    if (!formData.namaLengkap || !formData.tanggalLahir || !formData.jenisKelamin) {
-      setFormError('Data wajib belum lengkap');
-      return;
-    }
+    setSubmitting(true);
 
     try {
-      const url = editingId ? '/api/penduduk' : '/api/penduduk';
-      const method = editingId ? 'PUT' : 'POST';
-      const body = editingId ? { id: editingId, ...formData } : formData;
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) {
-        toast.success(editingId ? 'Data berhasil diupdate' : 'Data berhasil ditambahkan');
-        setShowForm(false);
-        fetchPenduduk();
-      } else {
-        const err = await res.json();
-        setFormError(err.error || 'Gagal menyimpan data');
+      // --- Submit KK Head or Edit ---
+      if (editingId) {
+        const res = await fetch('/api/penduduk', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingId, ...formData }),
+        });
+        if (res.ok) {
+          toast.success('Data berhasil diupdate');
+          setShowForm(false);
+          fetchPenduduk();
+        } else {
+          const err = await res.json();
+          setFormError(err.error || 'Gagal menyimpan data');
+        }
+        setSubmitting(false);
+        return;
       }
+
+      // --- Tambah Anggota mode ---
+      if (addMode === 'ANGGOTA') {
+        if (!validateNIK(formData.nik)) {
+          setFormError('NIK harus 16 digit angka');
+          setSubmitting(false);
+          return;
+        }
+        if (!formData.namaLengkap || !formData.tanggalLahir || !formData.jenisKelamin || !formData.statusKeluarga) {
+          setFormError('Data wajib belum lengkap');
+          setSubmitting(false);
+          return;
+        }
+        const res = await fetch('/api/penduduk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        if (res.ok) {
+          toast.success('Anggota keluarga berhasil ditambahkan');
+          setShowForm(false);
+          fetchPenduduk();
+        } else {
+          const err = await res.json();
+          setFormError(err.error || 'Gagal menyimpan data');
+        }
+        setSubmitting(false);
+        return;
+      }
+
+      // --- Tambah KK Baru mode ---
+      if (!validateNoKK(formData.noKK)) {
+        setFormError('No. KK harus 16 digit angka');
+        setSubmitting(false);
+        return;
+      }
+      if (!validateNIK(formData.nik)) {
+        setFormError('NIK Kepala Keluarga harus 16 digit angka');
+        setSubmitting(false);
+        return;
+      }
+      if (!formData.namaLengkap || !formData.tanggalLahir || !formData.jenisKelamin) {
+        setFormError('Data Kepala Keluarga wajib belum lengkap');
+        setSubmitting(false);
+        return;
+      }
+
+      // Validate anggota list
+      for (let i = 0; i < anggotaList.length; i++) {
+        const a = anggotaList[i];
+        a.noKK = formData.noKK;
+        if (!validateNIK(a.nik)) {
+          setFormError(`NIK anggota #${i + 1} (${a.namaLengkap || 'belum diisi'}) harus 16 digit angka`);
+          setSubmitting(false);
+          return;
+        }
+        if (!a.namaLengkap || !a.tanggalLahir || !a.jenisKelamin || !a.statusKeluarga) {
+          setFormError(`Data anggota #${i + 1} (${a.namaLengkap || 'belum diisi'}) belum lengkap (NIK, Nama, JK, Status, Tgl Lahir wajib)`);
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // Submit KK head
+      const headRes = await fetch('/api/penduduk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (!headRes.ok) {
+        const err = await headRes.json();
+        setFormError(err.error || 'Gagal menambah Kepala Keluarga');
+        setSubmitting(false);
+        return;
+      }
+
+      // Submit each anggota
+      let successCount = 1;
+      let errorMsg = '';
+      for (let i = 0; i < anggotaList.length; i++) {
+        const a = { ...anggotaList[i], noKK: formData.noKK };
+        try {
+          const res = await fetch('/api/penduduk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(a),
+          });
+          if (res.ok) {
+            successCount++;
+          } else {
+            const err = await res.json();
+            errorMsg += `Anggota #${i + 1} (${a.namaLengkap}): ${err.error || 'gagal'}; `;
+          }
+        } catch {
+          errorMsg += `Anggota #${i + 1} (${a.namaLengkap}): error jaringan; `;
+        }
+      }
+
+      if (anggotaList.length > 0) {
+        if (errorMsg) {
+          toast.warning(`KK + ${successCount - 1} anggota tersimpan. ${errorMsg}`);
+        } else {
+          toast.success(`KK + ${anggotaList.length} anggota berhasil ditambahkan!`);
+        }
+      } else {
+        toast.success('Kepala Keluarga berhasil ditambahkan');
+      }
+
+      setShowForm(false);
+      fetchPenduduk();
     } catch {
       setFormError('Terjadi kesalahan');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -312,11 +432,11 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
     if (!file) return;
 
     setImporting(true);
-    const formData = new FormData();
-    formData.append('file', file);
+    const formDataImport = new FormData();
+    formDataImport.append('file', file);
 
     try {
-      const res = await fetch('/api/penduduk/import', { method: 'POST', body: formData });
+      const res = await fetch('/api/penduduk/import', { method: 'POST', body: formDataImport });
       if (res.ok) {
         const data = await res.json();
         toast.success(`${data.message}${data.errors?.length ? ` (${data.errors.length} error)` : ''}`);
@@ -371,6 +491,7 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-emerald-600" />
           <h2 className="text-lg font-bold text-emerald-800">Data Penduduk</h2>
+          <Badge variant="secondary" className="text-xs">{penduduk.length} orang</Badge>
         </div>
         <div className="flex gap-2">
           {isAdmin && (
@@ -379,28 +500,40 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
             </Button>
           )}
           {isAdmin && (
-            <Button size="sm" onClick={() => openAddForm()} className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="h-4 w-4 mr-1" /> Tambah KK
-            </Button>
+            <div ref={addMenuRef} className="relative">
+              <Button
+                size="sm"
+                onClick={() => setShowAddMenu(!showAddMenu)}
+                className="bg-emerald-600 hover:bg-emerald-700 min-w-[120px] justify-between"
+              >
+                <span className="flex items-center">
+                  <Plus className="h-4 w-4 mr-1" /> Tambah
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 ml-1" />
+              </Button>
+              {showAddMenu && (
+                <div className="absolute right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl py-1 w-48">
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 transition-colors flex items-center gap-2"
+                    onClick={() => openAddForm(undefined, false)}
+                  >
+                    <Users className="h-4 w-4 text-emerald-600" />
+                    Tambah KK Baru
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors flex items-center gap-2"
+                    onClick={() => openAddForm(undefined, true)}
+                  >
+                    <Plus className="h-4 w-4 text-blue-600" />
+                    Tambah Anggota Keluarga
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
-      </div>
-
-      {/* Filter */}
-      <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-emerald-600 shrink-0" />
-        <Label className="text-xs font-medium whitespace-nowrap">Filter:</Label>
-        <Select value={activeFilter} onValueChange={v => setActiveFilter(v as FilterType)}>
-          <SelectTrigger className="text-sm h-8 w-auto min-w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(FILTER_LABELS).map(([key, label]) => (
-              <SelectItem key={key} value={key}>{label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Badge variant="secondary" className="text-xs ml-auto">{filteredCount} orang</Badge>
       </div>
 
       {/* Search */}
@@ -448,7 +581,6 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
                   {/* Expanded Members */}
                   {isExpanded && (
                     <div className="border-t border-gray-100 bg-gray-50/50">
-                      {/* Kepala Keluarga */}
                       {group.kepala && (
                         <PendudukRow
                           penduduk={group.kepala}
@@ -456,10 +588,9 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
                           isAdmin={isAdmin}
                           onEdit={openEditForm}
                           onDelete={setDeleteTarget}
-                          onAddMember={() => openAddForm(group.noKK)}
+                          onAddMember={() => openAddForm(group.noKK, true)}
                         />
                       )}
-                      {/* Anggota */}
                       {group.anggota.map(a => (
                         <PendudukRow
                           key={a.id}
@@ -479,7 +610,7 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
           {kkGroups.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <p>Tidak ada data penduduk</p>
-              {isAdmin && <p className="text-xs mt-1">Klik &quot;Tambah KK&quot; untuk menambahkan data baru</p>}
+              {isAdmin && <p className="text-xs mt-1">Klik &quot;Tambah&quot; untuk menambahkan data baru</p>}
             </div>
           )}
         </div>
@@ -487,9 +618,9 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
 
       {/* Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit Data Penduduk' : 'Tambah Data Penduduk'}</DialogTitle>
+            <DialogTitle>{editingId ? 'Edit Data Penduduk' : addMode === 'ANGGOTA' ? 'Tambah Anggota Keluarga' : 'Tambah KK Baru & Anggota Keluarga'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {formError && (
@@ -497,26 +628,58 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">No. KK *</Label>
-                <Input
-                  className="text-sm"
-                  value={formData.noKK}
-                  onChange={e => updateField('noKK', e.target.value)}
-                  placeholder="16 digit"
-                  maxLength={16}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">NIK *</Label>
-                <Input
-                  className="text-sm"
-                  value={formData.nik}
-                  onChange={e => updateField('nik', e.target.value)}
-                  placeholder="16 digit"
-                  maxLength={16}
-                />
-              </div>
+              {!editingId && addMode === 'ANGGOTA' ? (
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">Pilih KK *</Label>
+                  <Select value={formData.noKK} onValueChange={v => updateField('noKK', v)}>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="Pilih KK..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {kkList.map(kk => (
+                        <SelectItem key={kk.noKK} value={kk.noKK}>
+                          <span className="font-mono text-xs">{kk.noKK}</span> — {kk.namaKepala}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs">No. KK *</Label>
+                    <Input
+                      className="text-sm"
+                      value={formData.noKK}
+                      onChange={e => updateField('noKK', e.target.value)}
+                      placeholder="16 digit"
+                      maxLength={16}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">NIK *</Label>
+                    <Input
+                      className="text-sm"
+                      value={formData.nik}
+                      onChange={e => updateField('nik', e.target.value)}
+                      placeholder="16 digit"
+                      maxLength={16}
+                    />
+                  </div>
+                </>
+              )}
+              {!editingId && addMode === 'ANGGOTA' && (
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">NIK *</Label>
+                  <Input
+                    className="text-sm"
+                    value={formData.nik}
+                    onChange={e => updateField('nik', e.target.value)}
+                    placeholder="16 digit"
+                    maxLength={16}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -541,12 +704,23 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Status Keluarga</Label>
-                <Select value={formData.statusKeluarga} onValueChange={v => updateField('statusKeluarga', v)}>
-                  <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
-                  <SelectContent>
-                    {STATUS_KELUARGA.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                {(!editingId && addMode === 'ANGGOTA') ? (
+                  <Select value={formData.statusKeluarga} onValueChange={v => updateField('statusKeluarga', v)}>
+                    <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
+                    <SelectContent>
+                      {STATUS_KELUARGA.filter(s => s !== 'KEPALA KELUARGA').map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                ) : !editingId ? (
+                  <Input className="text-sm bg-gray-50" value="KEPALA KELUARGA" disabled />
+                ) : (
+                  <Select value={formData.statusKeluarga} onValueChange={v => updateField('statusKeluarga', v)}>
+                    <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
+                    <SelectContent>
+                      {STATUS_KELUARGA.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
 
@@ -705,11 +879,262 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
               </div>
             </div>
 
+            {/* Anggota Keluarga Section - hanya di mode KK_BARU */}
+            {!editingId && addMode === 'KK_BARU' && (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-blue-600" />
+                    <Label className="text-sm font-semibold text-blue-700">Anggota Keluarga</Label>
+                    {anggotaList.length > 0 && (
+                      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">{anggotaList.length} orang</Badge>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addAnggota}
+                    className="text-xs border-blue-300 text-blue-600 hover:bg-blue-50"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Tambah Anggota
+                  </Button>
+                </div>
+
+                {anggotaList.length === 0 && (
+                  <div className="text-center py-4 bg-blue-50/50 rounded-lg border border-dashed border-blue-200">
+                    <p className="text-xs text-blue-500">Belum ada anggota. Klik &quot;Tambah Anggota&quot; untuk menambahkan.</p>
+                    <p className="text-[10px] text-blue-400 mt-1">Anda bisa menambahkan anggota nanti melalui tombol + pada KK.</p>
+                  </div>
+                )}
+
+                {anggotaList.map((anggota, idx) => {
+                  const isExp = expandedAnggota.has(idx);
+                  return (
+                    <div key={idx} className="border border-blue-200 rounded-lg overflow-hidden bg-white">
+                      {/* Anggota Header Row */}
+                      <div
+                        className="flex items-center gap-2 px-3 py-2 bg-blue-50/80 cursor-pointer hover:bg-blue-100/80 transition-colors"
+                        onClick={() => toggleAnggotaExpand(idx)}
+                      >
+                        {isExp ? (
+                          <ChevronUp className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        )}
+                        <span className="text-xs font-medium text-blue-700">Anggota #{idx + 1}</span>
+                        {anggota.namaLengkap && (
+                          <span className="text-xs text-blue-500">— {anggota.namaLengkap}</span>
+                        )}
+                        <div className="flex-1" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={(e) => { e.stopPropagation(); removeAnggota(idx); }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+
+                      {/* Anggota Form Fields */}
+                      {isExp && (
+                        <div className="p-3 space-y-3 border-t border-blue-100">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">NIK *</Label>
+                              <Input
+                                className="text-sm"
+                                value={anggota.nik}
+                                onChange={e => updateAnggotaField(idx, 'nik', e.target.value)}
+                                placeholder="16 digit"
+                                maxLength={16}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Nama Lengkap *</Label>
+                              <Input
+                                className="text-sm uppercase"
+                                value={anggota.namaLengkap}
+                                onChange={e => updateAnggotaField(idx, 'namaLengkap', e.target.value.toUpperCase())}
+                                placeholder="NAMA LENGKAP"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Jenis Kelamin *</Label>
+                              <Select value={anggota.jenisKelamin} onValueChange={v => updateAnggotaField(idx, 'jenisKelamin', v)}>
+                                <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
+                                <SelectContent>
+                                  {JENIS_KELAMIN.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Status Keluarga *</Label>
+                              <Select value={anggota.statusKeluarga} onValueChange={v => updateAnggotaField(idx, 'statusKeluarga', v)}>
+                                <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
+                                <SelectContent>
+                                  {STATUS_KELUARGA.filter(s => s !== 'KEPALA KELUARGA').map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Tanggal Lahir *</Label>
+                              <Input
+                                type="date"
+                                className="text-sm"
+                                value={anggota.tanggalLahir}
+                                onChange={e => updateAnggotaField(idx, 'tanggalLahir', e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Tempat Lahir</Label>
+                              <Input
+                                className="text-sm uppercase"
+                                value={anggota.tempatLahir}
+                                onChange={e => updateAnggotaField(idx, 'tempatLahir', e.target.value.toUpperCase())}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Agama</Label>
+                              <Select value={anggota.agama} onValueChange={v => updateAnggotaField(idx, 'agama', v)}>
+                                <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
+                                <SelectContent>
+                                  {AGAMA.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Pendidikan</Label>
+                              <Select value={anggota.pendidikan} onValueChange={v => updateAnggotaField(idx, 'pendidikan', v)}>
+                                <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
+                                <SelectContent>
+                                  {PENDIDIKAN.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Pekerjaan</Label>
+                              <Select value={anggota.pekerjaan} onValueChange={v => updateAnggotaField(idx, 'pekerjaan', v)}>
+                                <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
+                                <SelectContent>
+                                  {PEKERJAAN.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Status Perkawinan</Label>
+                              <Select value={anggota.statusPerkawinan} onValueChange={v => updateAnggotaField(idx, 'statusPerkawinan', v)}>
+                                <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
+                                <SelectContent>
+                                  {STATUS_PERKAWINAN.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Kewarganegaraan</Label>
+                              <Input
+                                className="text-sm uppercase"
+                                value={anggota.kewarganegaraan}
+                                onChange={e => updateAnggotaField(idx, 'kewarganegaraan', e.target.value.toUpperCase())}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Nama Panggilan</Label>
+                              <Input
+                                className="text-sm uppercase"
+                                value={anggota.namaPanggilan}
+                                onChange={e => updateAnggotaField(idx, 'namaPanggilan', e.target.value.toUpperCase())}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">No. HP</Label>
+                              <Input
+                                className="text-sm"
+                                value={anggota.noHP}
+                                onChange={e => updateAnggotaField(idx, 'noHP', e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Status KTP</Label>
+                              <Select value={anggota.punyaKTP} onValueChange={v => updateAnggotaField(idx, 'punyaKTP', v)}>
+                                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {STATUS_KTP.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">BPJS</Label>
+                              <Select value={anggota.bpjs} onValueChange={v => updateAnggotaField(idx, 'bpjs', v)}>
+                                <SelectTrigger className="text-sm"><SelectValue placeholder="Pilih" /></SelectTrigger>
+                                <SelectContent>
+                                  {BPJS_OPTIONS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-xs">Bantuan</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {BANTUAN_OPTIONS.map(b => (
+                                <label key={b} className="flex items-center gap-1.5 cursor-pointer">
+                                  <Checkbox
+                                    checked={anggota.bantuan.includes(b)}
+                                    onCheckedChange={() => toggleAnggotaBantuan(idx, b)}
+                                  />
+                                  <span className="text-xs">{b}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-xs">Keterangan</Label>
+                            <Input
+                              className="text-sm"
+                              value={anggota.keterangan}
+                              onChange={e => updateAnggotaField(idx, 'keterangan', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="flex gap-2 pt-2">
-              <Button onClick={handleSubmit} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
-                {editingId ? 'Simpan Perubahan' : 'Tambah Data'}
+              <Button onClick={handleSubmit} disabled={submitting} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    Menyimpan...
+                  </span>
+                ) : editingId ? 'Simpan Perubahan' : addMode === 'ANGGOTA' ? 'Tambah Anggota' : `Simpan KK${anggotaList.length > 0 ? ` + ${anggotaList.length} Anggota` : ''}`}
               </Button>
-              <Button variant="outline" onClick={() => setShowForm(false)}>Batal</Button>
+              <Button variant="outline" onClick={() => setShowForm(false)} disabled={submitting}>Batal</Button>
             </div>
           </div>
         </DialogContent>
