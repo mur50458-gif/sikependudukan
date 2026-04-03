@@ -60,9 +60,9 @@ export const STATUS_PERKAWINAN = [
 
 export const BANTUAN_OPTIONS = ['TIDAK', 'PKH', 'BPNT', 'BLT', 'LAINNYA'] as const;
 
-export const BPJS_OPTIONS = ['TIDAK', 'BPI', 'MANDIRI', 'KETENAGAKERJAAN'] as const;
+export const BPJS_OPTIONS = ['TIDAK', 'PBI', 'MANDIRI', 'KETENAGAKERJAAN', 'JKN-KP'] as const;
 
-export const STATUS_KTP = ['PUNYA', 'BELUM'] as const;
+export const STATUS_KTP = ['PUNYA', 'BELUM', 'RUSAK', 'HILANG'] as const;
 
 export const JENIS_KEJADIAN = ['LAHIR', 'MATI', 'PINDAH', 'DATANG'] as const;
 
