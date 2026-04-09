@@ -98,13 +98,13 @@ const defaultFormData = {
   bantuan: [] as string[],
   bpjs: '',
   keterangan: '',
-  alamat: '',
-  rt: '',
-  rw: '',
-  kelurahan: '',
-  kecamatan: '',
-  kabupatenKota: '',
-  provinsi: '',
+  alamat: 'KP. CEMPLANG',
+  rt: '001',
+  rw: '002',
+  kelurahan: 'SUKAMAJU',
+  kecamatan: 'CIBUNGBULANG',
+  kabupatenKota: 'BOGOR',
+  provinsi: 'JAWA BARAT',
 };
 
 interface TabPendudukProps {
