@@ -35,6 +35,9 @@ export async function POST(request: NextRequest) {
     // 2) Parse all rows first, validate, collect into batch
     let currentNoKK = '';
     const batch: Record<string, unknown>[] = [];
+    // Track bantuan & BPJS per KK from the KK head
+    const kkBantuanMap = new Map<string, string>(); // noKK -> bantuan JSON string
+    const kkBpjsMap = new Map<string, string | null>(); // noKK -> bpjs value
 
     for (let i = 2; i < rows.length; i++) {
       const row = rows[i];
@@ -106,6 +109,23 @@ export async function POST(request: NextRequest) {
       }
 
       existingNiks.add(nik.toUpperCase());
+
+      // Determine bantuan & bpjs: use KK head's value if member, or set from this row if KK head
+      const isKKHead = toUpperCase(statusKeluarga) === 'KEPALA KELUARGA';
+      let finalBantuan = '[]';
+      let finalBpjs: string | null = null;
+
+      if (isKKHead) {
+        finalBantuan = '[]'; // BPJS and bantuan not in Excel import columns for penduduk
+        finalBpjs = bpjs ? bpjs.toUpperCase() : null;
+        kkBantuanMap.set(currentNoKK, finalBantuan);
+        kkBpjsMap.set(currentNoKK, finalBpjs);
+      } else {
+        // Anggota: inherit from KK head if already seen
+        finalBantuan = kkBantuanMap.get(currentNoKK) || '[]';
+        finalBpjs = kkBpjsMap.get(currentNoKK) ?? null;
+      }
+
       batch.push({
         noKK: currentNoKK,
         nik: nik.toUpperCase(),
@@ -124,8 +144,8 @@ export async function POST(request: NextRequest) {
         namaPanggilan: namaPanggilan ? toUpperCase(namaPanggilan) : null,
         noHP: null,
         punyaKTP: 'BELUM',
-        bantuan: '[]',
-        bpjs: bpjs ? bpjs.toUpperCase() : null,
+        bantuan: finalBantuan,
+        bpjs: finalBpjs,
         keterangan: keterangan || null,
         alamat: 'KP. CEMPLANG',
         rt: '001',
@@ -147,6 +167,20 @@ export async function POST(request: NextRequest) {
         skipDuplicates: true,
       });
       imported += result.count;
+    }
+
+    // 4) Propagate KK head's bantuan & BPJS to all existing family members in DB
+    for (const [noKK, bantuan] of kkBantuanMap) {
+      const bpjs = kkBpjsMap.get(noKK) ?? null;
+      const propagateData: Record<string, unknown> = { bantuan };
+      if (bpjs !== undefined) propagateData.bpjs = bpjs;
+      await db.penduduk.updateMany({
+        where: {
+          noKK,
+          statusKeluarga: { not: 'KEPALA KELUARGA' },
+        },
+        data: propagateData,
+      });
     }
 
     return NextResponse.json({
