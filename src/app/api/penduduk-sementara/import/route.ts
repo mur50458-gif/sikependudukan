@@ -17,16 +17,8 @@ export async function POST(request: NextRequest) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' }) as string[][];
 
-    let imported = 0;
     let errors: string[] = [];
-
-    // Column mapping (with defval:'', all rows have consistent length):
-    // [0] NO. KK, [1] Nama Lengkap, [2] NIK, [3] Jenis Kelamin,
-    // [4] Status keluarga, [5] Tempat Lahir, [6] Tanggal Lahir,
-    // [7] Agama, [8] Pendidikan, [9] Jenis Pekerjaan,
-    // [10] Sataus Perkawinan, [11] kewarga Negaraan,
-    // [12] Status Warga, [13] Nama Orang Tua Ayah, [14] Nama Orang Tua Ibu,
-    // [15] Nama Panggilan, [16] Keterangan
+    const today = new Date().toISOString().split('T')[0];
 
     // Normalize status keterangan
     const normalizeStatus = (raw: string): string => {
@@ -37,15 +29,18 @@ export async function POST(request: NextRequest) {
       if (upper.includes('MENUMPANG') || upper.includes('NUMPANG')) return 'NUMPANG KELUARGA';
       if (upper.includes('KOS') || upper.includes('KOST')) return 'KOS';
       if (upper.includes('NUMPANG') || upper.includes('NOMPANG')) return 'NUMPANG KELUARGA';
-      if (upper.includes('MENUMPANG')) return 'MENUMPANG';
-      return upper;
       return upper;
     };
 
-    let currentNoKK = '';
-    const today = new Date().toISOString().split('T')[0];
+    // 1) Pre-fetch all existing NIKs in ONE query
+    const existingNiks = new Set(
+      (await db.pendudukSementara.findMany({ select: { nik: true } })).map(r => r.nik)
+    );
 
-    // Skip header rows: rows[0] = header, rows[1] = sub-header (Ayah/Ibu)
+    // 2) Parse all rows first, validate, collect into batch
+    let currentNoKK = '';
+    const batch: Record<string, unknown>[] = [];
+
     for (let i = 2; i < rows.length; i++) {
       const row = rows[i];
       if (!row || row.length < 5) continue;
@@ -68,22 +63,15 @@ export async function POST(request: NextRequest) {
       const namaPanggilan = String(row[15] || '').trim();
       const keterangan = String(row[16] || '').trim();
 
-      // Skip empty rows
       if (!namaLengkap) continue;
-
-      // Skip rows that are only status-related (e.g., only WNI in column)
       if (!jenisKelamin && !tempatLahir && !tanggalLahirRaw && !agama) continue;
 
-      // Track current No. KK (only KK head has No. KK value)
-      if (noKKRaw) {
-        currentNoKK = noKKRaw;
-      }
+      if (noKKRaw) currentNoKK = noKKRaw;
 
       if (!currentNoKK) {
         errors.push(`Baris ${i + 1}: No. KK tidak ditemukan - ${namaLengkap}`);
         continue;
       }
-
       if (!nik) {
         errors.push(`Baris ${i + 1}: NIK kosong - ${namaLengkap}`);
         continue;
@@ -95,7 +83,12 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Parse tanggal lahir - format: "MM/DD/YY" (e.g., "10/10/81", "6/12/83")
+      if (existingNiks.has(nik.toUpperCase())) {
+        errors.push(`Baris ${i + 1}: NIK ${nik} sudah ada (${namaLengkap})`);
+        continue;
+      }
+
+      // Parse tanggal lahir
       let tanggalLahirStr = '';
       if (tanggalLahirRaw && tanggalLahirRaw.includes('/')) {
         const parts = tanggalLahirRaw.split('/');
@@ -108,17 +101,13 @@ export async function POST(request: NextRequest) {
             year = year > currentCentury2Digit ? 1900 + year : 2000 + year;
           }
           const date = new Date(year, month, day);
-          if (!isNaN(date.getTime())) {
-            tanggalLahirStr = date.toISOString().split('T')[0];
-          }
+          if (!isNaN(date.getTime())) tanggalLahirStr = date.toISOString().split('T')[0];
         }
       } else if (tanggalLahirRaw && !isNaN(Number(tanggalLahirRaw))) {
         const serialDate = parseInt(tanggalLahirRaw);
         const epoch = new Date(1899, 11, 30);
         const date = new Date(epoch.getTime() + serialDate * 86400000);
-        if (!isNaN(date.getTime())) {
-          tanggalLahirStr = date.toISOString().split('T')[0];
-        }
+        if (!isNaN(date.getTime())) tanggalLahirStr = date.toISOString().split('T')[0];
       } else if (tanggalLahirRaw && tanggalLahirRaw.includes('-')) {
         tanggalLahirStr = tanggalLahirRaw.split(' ')[0];
       }
@@ -128,52 +117,52 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      try {
-        // Check NIK uniqueness
-        const existing = await db.pendudukSementara.findFirst({ where: { nik } });
-        if (existing) {
-          errors.push(`Baris ${i + 1}: NIK ${nik} sudah ada (${namaLengkap})`);
-          continue;
-        }
+      const alamatAsal = keterangan || '';
+      existingNiks.add(nik.toUpperCase());
+      batch.push({
+        noKK: currentNoKK,
+        nik: nik.toUpperCase(),
+        namaLengkap: toUpperCase(namaLengkap),
+        jenisKelamin: toUpperCase(jenisKelamin),
+        statusKeluarga: toUpperCase(statusKeluarga),
+        tempatLahir: toUpperCase(tempatLahir),
+        tanggalLahir: new Date(tanggalLahirStr),
+        agama: toUpperCase(agama),
+        pendidikan: toUpperCase(pendidikan),
+        pekerjaan: toUpperCase(pekerjaan),
+        statusPerkawinan: toUpperCase(statusPerkawinan),
+        kewarganegaraan: toUpperCase(kewarganegaraan),
+        namaAyah: toUpperCase(namaAyah),
+        namaIbu: toUpperCase(namaIbu),
+        namaPanggilan: namaPanggilan ? toUpperCase(namaPanggilan) : null,
+        noHP: null,
+        statusKeterangan: statusKeterangan,
+        alamatAsal: alamatAsal,
+        tanggalMasuk: new Date(today),
+        tanggalKeluar: null,
+        keterangan: null,
+        bantuan: '[]',
+        bpjs: null,
+        alamat: 'KP. CEMPLANG',
+        rt: '001',
+        rw: '002',
+        kelurahan: 'SUKAMAJU',
+        kecamatan: 'CIBUNGBULANG',
+        kabupatenKota: 'BOGOR',
+        provinsi: 'JAWA BARAT',
+      });
+    }
 
-        const alamatAsal = keterangan || '';
-
-        await db.pendudukSementara.create({
-          data: {
-            noKK: currentNoKK,
-            nik,
-            namaLengkap: toUpperCase(namaLengkap),
-            jenisKelamin: toUpperCase(jenisKelamin),
-            statusKeluarga: toUpperCase(statusKeluarga),
-            tempatLahir: toUpperCase(tempatLahir),
-            tanggalLahir: new Date(tanggalLahirStr),
-            agama: toUpperCase(agama),
-            pendidikan: toUpperCase(pendidikan),
-            pekerjaan: toUpperCase(pekerjaan),
-            statusPerkawinan: toUpperCase(statusPerkawinan),
-            kewarganegaraan: toUpperCase(kewarganegaraan),
-            namaAyah: toUpperCase(namaAyah),
-            namaIbu: toUpperCase(namaIbu),
-            namaPanggilan: namaPanggilan ? toUpperCase(namaPanggilan) : null,
-            noHP: null,
-            statusKeterangan: statusKeterangan,
-            alamatAsal: alamatAsal,
-            tanggalMasuk: new Date(today),
-            tanggalKeluar: null,
-            keterangan: null,
-            alamat: 'KP. CEMPLANG',
-            rt: '001',
-            rw: '002',
-            kelurahan: 'SUKAMAJU',
-            kecamatan: 'CIBUNGBULANG',
-            kabupatenKota: 'BOGOR',
-            provinsi: 'JAWA BARAT',
-          },
-        });
-        imported++;
-      } catch (err) {
-        errors.push(`Baris ${i + 1}: Gagal menyimpan ${namaLengkap} - ${String(err)}`);
-      }
+    // 3) Batch insert in chunks of 100
+    let imported = 0;
+    const CHUNK_SIZE = 100;
+    for (let i = 0; i < batch.length; i += CHUNK_SIZE) {
+      const chunk = batch.slice(i, i + CHUNK_SIZE);
+      const result = await db.pendudukSementara.createMany({
+        data: chunk,
+        skipDuplicates: true,
+      });
+      imported += result.count;
     }
 
     return NextResponse.json({

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Trash2, AlertTriangle, Loader2, Database } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Statistik {
   totalKK: number;
@@ -83,17 +84,17 @@ export default function TabBeranda({ isAdmin = false, isActive = false }: TabBer
     try {
       const res = await fetch('/api/penduduk?all=true', { method: 'DELETE' });
       if (res.ok) {
-        const result = await res.json();
-        setDeleteMsg(result.message);
+        toast.success('Seluruh data berhasil dihapus');
         setDeleteDialogOpen(false);
         setDeleteConfirmText('');
-        fetchStatistik();
+        // Reload seluruh halaman agar semua tab kembali kosong
+        setTimeout(() => { window.location.reload(); }, 500);
       } else {
         const err = await res.json();
-        setDeleteMsg(err.error || 'Gagal menghapus data');
+        toast.error(err.error || 'Gagal menghapus data');
       }
     } catch (error) {
-      setDeleteMsg('Gagal menghapus data');
+      toast.error('Gagal menghapus data');
     } finally {
       setDeleting(false);
     }
