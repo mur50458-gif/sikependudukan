@@ -248,8 +248,20 @@ export default function TabPendudukSementara({ isAdmin = true }: TabPendudukSeme
         const result = await res.json();
         toast.success(`${result.message}${result.errors?.length ? ` (${result.errors.length} error)` : ''}`);
         if (result.errors) console.warn('Import errors:', result.errors);
-        fetchData();
         setShowImport(false);
+        setLoading(true);
+        setData([]);
+        setKKGroups([]);
+        const params = new URLSearchParams();
+        if (filterStatus) params.set('status', filterStatus);
+        if (search) params.set('search', search);
+        const res2 = await fetch(`/api/penduduk-sementara?${params}`);
+        if (res2.ok) {
+          const freshData = await res2.json();
+          setData(freshData);
+          groupByKK(freshData);
+        }
+        setLoading(false);
       } else {
         const err = await res.json();
         toast.error(err.error || 'Gagal mengimpor');
@@ -684,7 +696,7 @@ function SementaraRow({
         {penduduk.alamatAsal && (
           <p className="text-[10px] text-muted-foreground">{penduduk.alamatAsal}</p>
         )}
-        {isKK && penduduk.bantuan && penduduk.bantuan !== '[]' && (() => {
+        {penduduk.bantuan && penduduk.bantuan !== '[]' && (() => {
           const arr = JSON.parse(penduduk.bantuan);
           const active = arr.filter((b: string) => b !== 'TIDAK');
           if (active.length > 0) return (

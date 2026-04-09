@@ -1,0 +1,13 @@
+{
+	"appId": "com.sikependudukan.rt001rw002",
+	"appName": "Sikependudukan RT.001 RW.002",
+	"webDir": "out",
+	"server": {
+		"url": "https://sikependudukan.vercel.app"
+	},
+	"android": {
+		"allowMixedContent": true,
+		"backgroundColor": "#ffffff",
+		"useLegacyBridge": false
+	}
+}
