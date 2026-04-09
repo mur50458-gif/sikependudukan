@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -29,6 +29,13 @@ model Penduduk {
   bantuan          String    @default("[]")
   bpjs             String?
   keterangan       String?
+  alamat           String?
+  rt               String?
+  rw               String?
+  kelurahan        String?
+  kecamatan        String?
+  kabupatenKota    String?
+  provinsi         String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }

@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       tempatLahir, tanggalLahir, agama, pendidikan, pekerjaan,
       statusPerkawinan, kewarganegaraan, namaAyah, namaIbu,
       namaPanggilan, noHP, punyaKTP, bantuan, bpjs, keterangan,
+      alamat, rt, rw, kelurahan, kecamatan, kabupatenKota, provinsi,
     } = body;
 
     if (!validateNoKK(noKK)) {
@@ -80,6 +81,13 @@ export async function POST(request: NextRequest) {
         bantuan: bantuan ? JSON.stringify(bantuan) : '[]',
         bpjs: bpjs || null,
         keterangan: keterangan || null,
+        alamat: alamat ? toUpperCase(alamat) : null,
+        rt: rt || null,
+        rw: rw || null,
+        kelurahan: kelurahan ? toUpperCase(kelurahan) : null,
+        kecamatan: kecamatan ? toUpperCase(kecamatan) : null,
+        kabupatenKota: kabupatenKota ? toUpperCase(kabupatenKota) : null,
+        provinsi: provinsi ? toUpperCase(provinsi) : null,
       },
     });
 
@@ -130,6 +138,13 @@ export async function PUT(request: NextRequest) {
     if (data.bantuan !== undefined) updateData.bantuan = JSON.stringify(data.bantuan);
     if (data.bpjs !== undefined) updateData.bpjs = data.bpjs || null;
     if (data.keterangan !== undefined) updateData.keterangan = data.keterangan || null;
+    if (data.alamat !== undefined) updateData.alamat = data.alamat ? toUpperCase(data.alamat) : null;
+    if (data.rt !== undefined) updateData.rt = data.rt || null;
+    if (data.rw !== undefined) updateData.rw = data.rw || null;
+    if (data.kelurahan !== undefined) updateData.kelurahan = data.kelurahan ? toUpperCase(data.kelurahan) : null;
+    if (data.kecamatan !== undefined) updateData.kecamatan = data.kecamatan ? toUpperCase(data.kecamatan) : null;
+    if (data.kabupatenKota !== undefined) updateData.kabupatenKota = data.kabupatenKota ? toUpperCase(data.kabupatenKota) : null;
+    if (data.provinsi !== undefined) updateData.provinsi = data.provinsi ? toUpperCase(data.provinsi) : null;
 
     const penduduk = await db.penduduk.update({
       where: { id },

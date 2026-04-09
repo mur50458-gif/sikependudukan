@@ -62,6 +62,13 @@ interface Penduduk {
   bantuan: string;
   bpjs: string | null;
   keterangan: string | null;
+  alamat: string | null;
+  rt: string | null;
+  rw: string | null;
+  kelurahan: string | null;
+  kecamatan: string | null;
+  kabupatenKota: string | null;
+  provinsi: string | null;
 }
 
 interface KKGroup {
@@ -91,6 +98,13 @@ const defaultFormData = {
   bantuan: [] as string[],
   bpjs: '',
   keterangan: '',
+  alamat: '',
+  rt: '',
+  rw: '',
+  kelurahan: '',
+  kecamatan: '',
+  kabupatenKota: '',
+  provinsi: '',
 };
 
 interface TabPendudukProps {
@@ -269,6 +283,13 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
       bantuan: JSON.parse(p.bantuan || '[]'),
       bpjs: p.bpjs || '',
       keterangan: p.keterangan || '',
+      alamat: p.alamat || '',
+      rt: p.rt || '',
+      rw: p.rw || '',
+      kelurahan: p.kelurahan || '',
+      kecamatan: p.kecamatan || '',
+      kabupatenKota: p.kabupatenKota || '',
+      provinsi: p.provinsi || '',
     });
     setShowForm(true);
   };
@@ -879,6 +900,78 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
               </div>
             </div>
 
+            {/* Alamat Section */}
+            <div className="space-y-3 pt-2 border-t border-gray-200">
+              <Label className="text-xs font-semibold text-gray-600">ALAMAT</Label>
+              <div className="space-y-1">
+                <Label className="text-xs">Alamat</Label>
+                <Input
+                  className="text-sm uppercase"
+                  value={formData.alamat}
+                  onChange={e => updateField('alamat', e.target.value.toUpperCase())}
+                  placeholder="Alamat lengkap"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">RT</Label>
+                  <Input
+                    className="text-sm"
+                    value={formData.rt}
+                    onChange={e => updateField('rt', e.target.value)}
+                    placeholder="RT"
+                    maxLength={3}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">RW</Label>
+                  <Input
+                    className="text-sm"
+                    value={formData.rw}
+                    onChange={e => updateField('rw', e.target.value)}
+                    placeholder="RW"
+                    maxLength={3}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Kelurahan/Desa</Label>
+                <Input
+                  className="text-sm uppercase"
+                  value={formData.kelurahan}
+                  onChange={e => updateField('kelurahan', e.target.value.toUpperCase())}
+                  placeholder="Kelurahan/Desa"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Kecamatan</Label>
+                <Input
+                  className="text-sm uppercase"
+                  value={formData.kecamatan}
+                  onChange={e => updateField('kecamatan', e.target.value.toUpperCase())}
+                  placeholder="Kecamatan"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Kabupaten/Kota</Label>
+                <Input
+                  className="text-sm uppercase"
+                  value={formData.kabupatenKota}
+                  onChange={e => updateField('kabupatenKota', e.target.value.toUpperCase())}
+                  placeholder="Kabupaten/Kota"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Provinsi</Label>
+                <Input
+                  className="text-sm uppercase"
+                  value={formData.provinsi}
+                  onChange={e => updateField('provinsi', e.target.value.toUpperCase())}
+                  placeholder="Provinsi"
+                />
+              </div>
+            </div>
+
             {/* Anggota Keluarga Section - hanya di mode KK_BARU */}
             {!editingId && addMode === 'KK_BARU' && (
               <div className="space-y-3 pt-2">
@@ -1254,3 +1347,4 @@ function PendudukRow({
     </div>
   );
 }
+
