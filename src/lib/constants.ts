@@ -64,10 +64,6 @@ export const STATUS_KTP = ['PUNYA', 'BELUM', 'RUSAK', 'HILANG'] as const;
 
 export const JENIS_KEJADIAN = ['LAHIR', 'MATI', 'PINDAH', 'DATANG'] as const;
 
-export const JENIS_BANTUAN_SOSIAL = ['PKH', 'BPNT', 'BLT', 'BST', 'PIP', 'KUR', 'SUBSIDI', 'LAINNYA'] as const;
-
-export const STATUS_BANTUAN = ['AKTIF', 'TIDAK AKTIF'] as const;
-
 export const STATUS_KETERANGAN_SEMENTARA = ['KONTRAK', 'SEWA', 'MENUMPANG', 'KOS', 'NUMPANG KELUARGA'] as const;
 
 export const BULAN = [

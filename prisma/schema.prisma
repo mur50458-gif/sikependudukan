@@ -81,23 +81,6 @@ model LaporanBulanan {
   @@unique([bulan, tahun])
 }
 
-model BantuanSosial {
-  id              Int       @id @default(autoincrement())
-  noKK            String
-  nik             String
-  namaLengkap     String
-  jenisKelamin    String
-  statusKeluarga  String
-  jenisBantuan    String
-  nomorBantuan    String?
-  periodeMulai    String?
-  periodeSelesai  String?
-  status          String    @default("AKTIF")
-  keterangan      String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-}
-
 model Kejadian {
   id            Int       @id @default(autoincrement())
   jenisKejadian String
