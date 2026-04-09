@@ -149,6 +149,13 @@ export async function POST(request: NextRequest) {
             punyaKTP: 'BELUM',
             bantuan: '[]',
             bpjs: bpjs ? bpjs.toUpperCase() : null,
+            alamat: 'KP. CEMPLANG',
+            rt: '001',
+            rw: '002',
+            kelurahan: 'SUKAMAJU',
+            kecamatan: 'CIBUNGBULANG',
+            kabupatenKota: 'BOGOR',
+            provinsi: 'JAWA BARAT',
           },
         });
         imported++;
