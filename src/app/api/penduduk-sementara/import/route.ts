@@ -143,13 +143,6 @@ export async function POST(request: NextRequest) {
         keterangan: null,
         bantuan: '[]',
         bpjs: null,
-        alamat: 'KP. CEMPLANG',
-        rt: '001',
-        rw: '002',
-        kelurahan: 'SUKAMAJU',
-        kecamatan: 'CIBUNGBULANG',
-        kabupatenKota: 'BOGOR',
-        provinsi: 'JAWA BARAT',
       });
     }
 
