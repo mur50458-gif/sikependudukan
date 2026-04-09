@@ -38,7 +38,7 @@ interface TabCekBantuanProps {
   isAdmin?: boolean;
 }
 
-const DESIL_OPTIONS = ['DTK 1', 'DTK 2', 'DTK 3', 'DTK 4', 'DTK 5'] as const;
+const DESIL_OPTIONS = ['DESIL 1', 'DESIL 2', 'DESIL 3', 'DESIL 4', 'DESIL 5', 'DESIL 6-10'] as const;
 
 export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
   const [allPenduduk, setAllPenduduk] = useState<PendudukItem[]>([]);
@@ -78,12 +78,24 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
       )
     : allPenduduk;
 
-  const openCekBansos = (nik: string) => {
-    window.open(`https://cekbansos.kemensos.go.id/`, '_blank');
+  const openCekBansos = async (nik: string) => {
+    try {
+      await navigator.clipboard.writeText(nik);
+      toast.success(`NIK ${nik} disalin ke clipboard! Paste di website cekbansos.`);
+    } catch {
+      toast.info('NIK: ' + nik + ' — salin manual lalu paste di website.');
+    }
+    window.open('https://cekbansos.kemensos.go.id/', '_blank');
   };
 
-  const openCekDTK = (nik: string) => {
-    window.open(`https://cekdtk.kemensos.go.id/`, '_blank');
+  const openCekDTK = async (nik: string) => {
+    try {
+      await navigator.clipboard.writeText(nik);
+      toast.success(`NIK ${nik} disalin ke clipboard! Paste di website cek DTK.`);
+    } catch {
+      toast.info('NIK: ' + nik + ' — salin manual lalu paste di website.');
+    }
+    window.open('https://cekdtk.kemensos.go.id/', '_blank');
   };
 
   const openUpdateBantuan = (p: PendudukItem) => {
