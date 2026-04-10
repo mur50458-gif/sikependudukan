@@ -152,14 +152,15 @@ export async function PUT(request: NextRequest) {
       data: updateData,
     });
 
-    // Jika KEPALA KELUARGA update bantuan/bpjs, propagate ke semua anggota keluarga
+    // Jika KEPALA KELUARGA update bantuan/bpjs/keterangan, propagate ke semua anggota keluarga
     if (
-      (updateData.bantuan !== undefined || updateData.bpjs !== undefined) &&
+      (updateData.bantuan !== undefined || updateData.bpjs !== undefined || updateData.keterangan !== undefined) &&
       (result.statusKeluarga === 'KEPALA KELUARGA' || data.statusKeluarga === 'KEPALA KELUARGA')
     ) {
       const propagateData: Record<string, unknown> = {};
       if (updateData.bantuan !== undefined) propagateData.bantuan = updateData.bantuan;
       if (updateData.bpjs !== undefined) propagateData.bpjs = updateData.bpjs;
+      if (updateData.keterangan !== undefined) propagateData.keterangan = updateData.keterangan;
 
       if (Object.keys(propagateData).length > 0) {
         await db.pendudukSementara.updateMany({

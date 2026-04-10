@@ -214,6 +214,7 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
       noKK: formData.noKK || '',
       statusKeluarga: '',
       bantuan: [],
+      keterangan: formData.keterangan || '',
       kewarganegaraan: formData.kewarganegaraan || 'WNI',
       namaAyah: formData.namaAyah || '',
       namaIbu: formData.namaIbu || '',
@@ -397,7 +398,7 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
       let successCount = 1;
       let errorMsg = '';
       for (let i = 0; i < anggotaList.length; i++) {
-        const a = { ...anggotaList[i], noKK: formData.noKK };
+        const a = { ...anggotaList[i], noKK: formData.noKK, keterangan: formData.keterangan || anggotaList[i].keterangan };
         try {
           const res = await fetch('/api/penduduk', {
             method: 'POST',

@@ -162,7 +162,15 @@ export default function TabPendudukSementara({ isAdmin = true }: TabPendudukSeme
   const openAdd = (noKK?: string) => {
     setEditingId(null);
     setFormError('');
-    setFormData({ ...defaultFormData, noKK: noKK || '', bantuan: [] });
+    // Cari keterangan KK head jika menambah anggota
+    let kkKeterangan = '';
+    if (noKK) {
+      const group = kkGroups.find(g => g.noKK === noKK);
+      if (group?.kepala?.keterangan) {
+        kkKeterangan = group.kepala.keterangan;
+      }
+    }
+    setFormData({ ...defaultFormData, noKK: noKK || '', bantuan: [], keterangan: kkKeterangan, statusKeluarga: noKK ? '' : 'KEPALA KELUARGA' });
     setShowForm(true);
   };
 
