@@ -27,6 +27,17 @@ export async function PUT(
       data: updateData,
     });
 
+    // Propagate keterangan to family members if this is KK head
+    if (existing.statusKeluarga === 'KEPALA KELUARGA' && body.keterangan !== undefined) {
+      await db.pendudukSementara.updateMany({
+        where: {
+          noKK: existing.noKK,
+          statusKeluarga: { not: 'KEPALA KELUARGA' },
+        },
+        data: { keterangan: updateData.keterangan },
+      });
+    }
+
     return NextResponse.json({ message: 'Penduduk sementara updated' });
   } catch (error) {
     console.error('Update semantara bantuan error:', error);

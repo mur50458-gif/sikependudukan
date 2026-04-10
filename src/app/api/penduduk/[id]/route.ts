@@ -57,13 +57,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (body.kabupatenKota !== undefined) updateData.kabupatenKota = body.kabupatenKota || null;
     if (body.provinsi !== undefined) updateData.provinsi = body.provinsi || null;
 
-    // KK head propagation: if updating bantuan or bpjs for KK head, propagate to family
+    // KK head propagation: if updating bantuan/bpjs/keterangan for KK head, propagate to family
     const existing = await db.penduduk.findUnique({ where: { id } });
     if (existing && existing.statusKeluarga === 'KEPALA KELUARGA') {
       const shouldPropagateBantuan = body.bantuan !== undefined;
       const shouldPropagateBpjs = body.bpjs !== undefined;
+      const shouldPropagateKeterangan = body.keterangan !== undefined;
 
-      if (shouldPropagateBantuan || shouldPropagateBpjs) {
+      if (shouldPropagateBantuan || shouldPropagateBpjs || shouldPropagateKeterangan) {
         const members = await db.penduduk.findMany({
           where: { noKK: existing.noKK, id: { not: id } },
         });
@@ -72,6 +73,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
           const memberUpdate: any = {};
           if (shouldPropagateBantuan) memberUpdate.bantuan = updateData.bantuan;
           if (shouldPropagateBpjs) memberUpdate.bpjs = updateData.bpjs;
+          if (shouldPropagateKeterangan) memberUpdate.keterangan = updateData.keterangan;
 
           await db.penduduk.updateMany({
             where: { noKK: existing.noKK, id: { not: id } },
