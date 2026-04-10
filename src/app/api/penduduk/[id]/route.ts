@@ -59,18 +59,22 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
     // Propagation: always propagate bantuan/bpjs/keterangan to all family members in the same KK
     // (desil/bantuan is per-KK, not per-person, so all members should have the same)
+    let propagatedCount = 0;
+    let propagatedNoKK = '';
     if (body.bantuan !== undefined || body.bpjs !== undefined || body.keterangan !== undefined) {
       const existing = await db.penduduk.findUnique({ where: { id } });
       if (existing) {
+        propagatedNoKK = existing.noKK;
         const memberUpdate: any = {};
         if (body.bantuan !== undefined) memberUpdate.bantuan = updateData.bantuan;
         if (body.bpjs !== undefined) memberUpdate.bpjs = updateData.bpjs;
         if (body.keterangan !== undefined) memberUpdate.keterangan = updateData.keterangan;
 
-        await db.penduduk.updateMany({
+        const result = await db.penduduk.updateMany({
           where: { noKK: existing.noKK, id: { not: id } },
           data: memberUpdate,
         });
+        propagatedCount = result.count;
       }
     }
 
@@ -79,7 +83,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       data: updateData,
     });
 
-    return NextResponse.json(data);
+    return NextResponse.json({
+      ...data,
+      _debug: {
+        propagatedCount,
+        propagatedNoKK,
+        sentKeterangan: body.keterangan,
+        savedKeterangan: updateData.keterangan,
+        memberUpdateKeterangan: updateData.keterangan,
+        sentBpjs: body.bpjs,
+        savedBpjs: updateData.bpjs,
+      },
+    });
   } catch (error: any) {
     console.error('Update error:', error);
     return NextResponse.json({ error: 'Gagal mengupdate data: ' + String(error.message || error) }, { status: 500 });

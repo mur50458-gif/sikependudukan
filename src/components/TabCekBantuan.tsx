@@ -116,16 +116,27 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
         keterangan = desil + (keterangan ? ' | ' + keterangan : '');
       }
 
+      const bodySent = {
+        bantuan: jenisBantuan,
+        bpjs: bpjs || null,
+        keterangan: keterangan || null,
+      };
+
       const res = await fetch(`/api/penduduk/${selectedPenduduk.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bantuan: jenisBantuan,
-          bpjs: bpjs || null,
-          keterangan: keterangan || null,
-        }),
+        body: JSON.stringify(bodySent),
       });
       if (res.ok) {
+        const resJson = await res.json();
+        const dbg = resJson._debug || {};
+        console.log('[CEK BANTUAN DEBUG] KK Head update:', {
+          nama: selectedPenduduk.namaLengkap,
+          noKK: selectedPenduduk.noKK,
+          bodySent,
+          debug: dbg,
+        });
+
         // Update semua anggota KK yang sama dengan keterangan yang sama
         const familyMembers = allPenduduk.filter(p => p.noKK === selectedPenduduk.noKK && p.id !== selectedPenduduk.id);
         let anggotaUpdated = 0;
@@ -134,13 +145,18 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
             const memberRes = await fetch(`/api/penduduk/${member.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                bantuan: jenisBantuan,
-                bpjs: bpjs || null,
-                keterangan: keterangan || null,
-              }),
+              body: JSON.stringify(bodySent),
             });
-            if (memberRes.ok) anggotaUpdated++;
+            if (memberRes.ok) {
+              anggotaUpdated++;
+              const memberJson = await memberRes.json();
+              console.log('[CEK BANTUAN DEBUG] Anggota update:', {
+                nama: member.namaLengkap,
+                keterangan: memberJson.keterangan,
+                bpjs: memberJson.bpjs,
+                debug: memberJson._debug,
+              });
+            }
           } catch {}
 
           // Also update penduduk sementara if NIK exists
@@ -148,11 +164,7 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
             await fetch(`/api/penduduk-sementara/${member.nik}/bantuan`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                bantuan: jenisBantuan,
-                bpjs: bpjs || null,
-                keterangan: keterangan || null,
-              }),
+              body: JSON.stringify(bodySent),
             });
           } catch {}
         }
@@ -162,18 +174,16 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
           await fetch(`/api/penduduk-sementara/${selectedPenduduk.nik}/bantuan`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              bantuan: jenisBantuan,
-              bpjs: bpjs || null,
-              keterangan: keterangan || null,
-            }),
+            body: JSON.stringify(bodySent),
           });
         } catch {}
 
+        // Toast dengan detail debug
+        const debugInfo = `propagasi: ${dbg.propagatedCount} anggota, noKK: ${dbg.propagatedNoKK || '-'}, kirim keterangan: "${dbg.sentKeterangan}", simpan keterangan: "${dbg.savedKeterangan}", kirim bpjs: "${dbg.sentBpjs}", simpan bpjs: "${dbg.savedBpjs}"`;
         const msg = anggotaUpdated > 0
-          ? `Data bantuan ${selectedPenduduk.namaLengkap} tersimpan. Keterangan otomatis diupdate untuk ${anggotaUpdated} anggota keluarga.`
-          : `Data bantuan ${selectedPenduduk.namaLengkap} berhasil disimpan.`;
-        toast.success(msg);
+          ? `Tersimpan! ${anggotaUpdated} anggota diupdate. Keterangan: "${keterangan || '-'}", BPJS: "${bpjs || '-'}". [${debugInfo}]`
+          : `Tersimpan! Keterangan: "${keterangan || '-'}", BPJS: "${bpjs || '-'}". Tidak ada anggota lain di KK ini. [${debugInfo}]`;
+        toast.success(msg, { duration: 8000 });
         setShowForm(false);
         setSelectedPenduduk(null);
         fetchPenduduk();
