@@ -107,15 +107,37 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
     if (!selectedPenduduk) return;
     setSaving(true);
     try {
+      // Build keterangan: append desil if selected
+      let keterangan = selectedPenduduk.keterangan || '';
+      if (desil) {
+        // Remove old desil info from keterangan first
+        keterangan = keterangan.replace(/DESIL\s*\d[-\s]*\d*/gi, '').replace(/DTK\s*\d[-\s]*\d*/gi, '').trim();
+        keterangan = desil + (keterangan ? ' | ' + keterangan : '');
+      }
+
       const res = await fetch(`/api/penduduk/${selectedPenduduk.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bantuan: jenisBantuan,
           bpjs: bpjs || null,
+          keterangan: keterangan || null,
         }),
       });
       if (res.ok) {
+        // Also update penduduk sementara if NIK exists there
+        try {
+          await fetch(`/api/penduduk-sementara/${selectedPenduduk.nik}/bantuan`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bantuan: jenisBantuan,
+              bpjs: bpjs || null,
+              keterangan: keterangan || null,
+            }),
+          });
+        } catch {}
+
         toast.success(`Data bantuan ${selectedPenduduk.namaLengkap} berhasil disimpan`);
         setShowForm(false);
         setSelectedPenduduk(null);
