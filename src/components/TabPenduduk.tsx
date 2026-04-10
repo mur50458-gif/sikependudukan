@@ -197,10 +197,19 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
     setFormError('');
     setShowAddMenu(false);
     setAddMode(isAnggota ? 'ANGGOTA' : 'KK_BARU');
+    // Ambil keterangan dari KK head jika menambah anggota
+    let kkKeterangan = '';
+    if (noKK) {
+      const group = kkGroups.find(g => g.noKK === noKK);
+      if (group?.kepala?.keterangan) {
+        kkKeterangan = group.kepala.keterangan;
+      }
+    }
     setFormData({
       ...defaultFormData,
       noKK: noKK || '',
       bantuan: [],
+      keterangan: kkKeterangan,
       statusKeluarga: isAnggota ? '' : 'KEPALA KELUARGA',
     });
     setAnggotaList([]);
@@ -497,6 +506,11 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
 
   const updateField = (field: string, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Auto-sync keterangan ke semua anggota saat KK head ubah keterangan
+    if (field === 'keterangan') {
+      const val = value as string;
+      setAnggotaList(prev => prev.map(a => ({ ...a, keterangan: val })));
+    }
   };
 
   const toggleBantuan = (item: string) => {
