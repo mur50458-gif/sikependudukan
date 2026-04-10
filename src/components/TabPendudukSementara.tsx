@@ -708,6 +708,9 @@ function SementaraRow({
           );
           return null;
         })()}
+        {penduduk.keterangan && (
+          <p className="text-[10px] text-purple-600 font-medium mt-0.5">{penduduk.keterangan}</p>
+        )}
       </div>
       <div className="flex gap-1 shrink-0">
         {isAdmin && isKK && onAddMember && (
