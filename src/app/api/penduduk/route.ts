@@ -146,25 +146,55 @@ export async function PUT(request: NextRequest) {
     if (data.kabupatenKota !== undefined) updateData.kabupatenKota = data.kabupatenKota ? toUpperCase(data.kabupatenKota) : null;
     if (data.provinsi !== undefined) updateData.provinsi = data.provinsi ? toUpperCase(data.provinsi) : null;
 
-    const penduduk = await db.penduduk.update({
-      where: { id },
-      data: updateData,
+    // Use transaction for atomic update + propagation
+    const result = await db.$transaction(async (tx) => {
+      const updated = await tx.penduduk.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // Propagate bantuan/bpjs/keterangan ke semua anggota KK yang sama
+      // Hanya propagate field yang memiliki nilai (non-null, non-empty)
+      let propagatedCount = 0;
+      const propagateData: any = {};
+      // Keterangan: propagate jika ada isinya (desil, DTK, dll)
+      if (updateData.keterangan && updateData.keterangan !== null) {
+        propagateData.keterangan = updateData.keterangan;
+      }
+      // BPJS: propagate jika ada isinya (bukan null dan bukan TIDAK)
+      if (updateData.bpjs && updateData.bpjs !== null) {
+        propagateData.bpjs = updateData.bpjs;
+      }
+      // Bantuan: propagate jika ada isinya (bukan array kosong "[]")
+      if (updateData.bantuan && updateData.bantuan !== '[]') {
+        propagateData.bantuan = updateData.bantuan;
+      }
+
+      console.log(`[PROPAGATE DEBUG] id=${id}, noKK=${updated.noKK}, propagateData=`, JSON.stringify(propagateData));
+
+      if (Object.keys(propagateData).length > 0) {
+        const propagationResult = await tx.penduduk.updateMany({
+          where: { noKK: updated.noKK, id: { not: id } },
+          data: propagateData,
+        });
+        propagatedCount = propagationResult.count;
+        console.log(`[PROPAGATE DEBUG] propagatedCount=${propagatedCount}`);
+      }
+
+      return { data: updated, propagatedCount };
     });
 
-    // Propagate bantuan/bpjs/keterangan ke semua anggota KK yang sama
-    if (updateData.bantuan !== undefined || updateData.bpjs !== undefined || updateData.keterangan !== undefined) {
-      const propagateData: Record<string, unknown> = {};
-      if (updateData.bantuan !== undefined) propagateData.bantuan = updateData.bantuan;
-      if (updateData.bpjs !== undefined) propagateData.bpjs = updateData.bpjs;
-      if (updateData.keterangan !== undefined) propagateData.keterangan = updateData.keterangan;
-
-      await db.penduduk.updateMany({
-        where: { noKK: penduduk.noKK, id: { not: id } },
-        data: propagateData,
-      });
-    }
-
-    return NextResponse.json(penduduk);
+    return NextResponse.json({
+      ...result.data,
+      _debug: {
+        propagatedCount: result.propagatedCount,
+        propagatedNoKK: result.data.noKK,
+        sentKeterangan: data.keterangan,
+        savedKeterangan: updateData.keterangan,
+        sentBpjs: data.bpjs,
+        savedBpjs: updateData.bpjs,
+      },
+    });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: 'Gagal mengupdate data penduduk' }, { status: 500 });

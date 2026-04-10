@@ -22,6 +22,8 @@ export async function PUT(
     if (body.bpjs !== undefined) updateData.bpjs = body.bpjs || null;
     if (body.keterangan !== undefined) updateData.keterangan = body.keterangan || null;
 
+    console.log(`[SEMENTARA BANTUAN] nik=${nik}, bantuan=${updateData.bantuan}, bpjs=${updateData.bpjs}, keterangan=${updateData.keterangan}`);
+
     await db.pendudukSementara.update({
       where: { nik },
       data: updateData,

@@ -147,25 +147,43 @@ export async function PUT(request: NextRequest) {
     if (data.bantuan !== undefined) updateData.bantuan = JSON.stringify(data.bantuan);
     if (data.bpjs !== undefined) updateData.bpjs = data.bpjs ? data.bpjs.toUpperCase() : null;
 
-    const result = await db.pendudukSementara.update({
-      where: { id },
-      data: updateData,
+    // Use transaction for atomic update + propagation
+    const result = await db.$transaction(async (tx) => {
+      const updated = await tx.pendudukSementara.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // Propagate bantuan/bpjs/keterangan ke semua anggota KK yang sama
+      let propagatedCount = 0;
+      if (updateData.bantuan !== undefined || updateData.bpjs !== undefined || updateData.keterangan !== undefined) {
+        const propagateData: any = {};
+        if (updateData.bantuan !== undefined) propagateData.bantuan = updateData.bantuan;
+        if (updateData.bpjs !== undefined) propagateData.bpjs = updateData.bpjs;
+        if (updateData.keterangan !== undefined) propagateData.keterangan = updateData.keterangan;
+
+        console.log(`[SEMENTARA PROPAGATE DEBUG] id=${id}, noKK=${updated.noKK}, propagateData=`, JSON.stringify(propagateData));
+
+        if (Object.keys(propagateData).length > 0) {
+          const propagationResult = await tx.pendudukSementara.updateMany({
+            where: { noKK: updated.noKK, id: { not: id } },
+            data: propagateData,
+          });
+          propagatedCount = propagationResult.count;
+          console.log(`[SEMENTARA PROPAGATE DEBUG] propagatedCount=${propagatedCount}`);
+        }
+      }
+
+      return { data: updated, propagatedCount };
     });
 
-    // Propagate bantuan/bpjs/keterangan ke semua anggota KK yang sama
-    if (updateData.bantuan !== undefined || updateData.bpjs !== undefined || updateData.keterangan !== undefined) {
-      const propagateData: Record<string, unknown> = {};
-      if (updateData.bantuan !== undefined) propagateData.bantuan = updateData.bantuan;
-      if (updateData.bpjs !== undefined) propagateData.bpjs = updateData.bpjs;
-      if (updateData.keterangan !== undefined) propagateData.keterangan = updateData.keterangan;
-
-      await db.pendudukSementara.updateMany({
-        where: { noKK: result.noKK, id: { not: id } },
-        data: propagateData,
-      });
-    }
-
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result.data,
+      _debug: {
+        propagatedCount: result.propagatedCount,
+        propagatedNoKK: result.data.noKK,
+      },
+    });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: 'Gagal mengupdate penduduk sementara' }, { status: 500 });

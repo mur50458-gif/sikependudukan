@@ -116,11 +116,15 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
         keterangan = desil + (keterangan ? ' | ' + keterangan : '');
       }
 
-      const bodySent = {
+      const bodySent: Record<string, unknown> = {
         bantuan: jenisBantuan,
-        bpjs: bpjs || null,
-        keterangan: keterangan || null,
       };
+      // Only include bpjs if it was explicitly set (not empty string)
+      if (bpjs) bodySent.bpjs = bpjs;
+      // Only include keterangan if a desil was selected or existing keterangan exists
+      if (desil || (selectedPenduduk.keterangan && keterangan)) {
+        bodySent.keterangan = keterangan || null;
+      }
 
       const res = await fetch(`/api/penduduk/${selectedPenduduk.id}`, {
         method: 'PUT',
@@ -137,29 +141,10 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
           debug: dbg,
         });
 
-        // Update semua anggota KK yang sama dengan keterangan yang sama
+        // Update penduduk-sementara for all family members
+        // (penduduk propagation is handled by the backend via updateMany)
         const familyMembers = allPenduduk.filter(p => p.noKK === selectedPenduduk.noKK && p.id !== selectedPenduduk.id);
-        let anggotaUpdated = 0;
         for (const member of familyMembers) {
-          try {
-            const memberRes = await fetch(`/api/penduduk/${member.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(bodySent),
-            });
-            if (memberRes.ok) {
-              anggotaUpdated++;
-              const memberJson = await memberRes.json();
-              console.log('[CEK BANTUAN DEBUG] Anggota update:', {
-                nama: member.namaLengkap,
-                keterangan: memberJson.keterangan,
-                bpjs: memberJson.bpjs,
-                debug: memberJson._debug,
-              });
-            }
-          } catch {}
-
-          // Also update penduduk sementara if NIK exists
           try {
             await fetch(`/api/penduduk-sementara/${member.nik}/bantuan`, {
               method: 'PUT',
@@ -179,10 +164,8 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
         } catch {}
 
         // Toast dengan detail debug
-        const debugInfo = `propagasi: ${dbg.propagatedCount} anggota, noKK: ${dbg.propagatedNoKK || '-'}, kirim keterangan: "${dbg.sentKeterangan}", simpan keterangan: "${dbg.savedKeterangan}", kirim bpjs: "${dbg.sentBpjs}", simpan bpjs: "${dbg.savedBpjs}"`;
-        const msg = anggotaUpdated > 0
-          ? `Tersimpan! ${anggotaUpdated} anggota diupdate. Keterangan: "${keterangan || '-'}", BPJS: "${bpjs || '-'}". [${debugInfo}]`
-          : `Tersimpan! Keterangan: "${keterangan || '-'}", BPJS: "${bpjs || '-'}". Tidak ada anggota lain di KK ini. [${debugInfo}]`;
+        const debugInfo = `propagasi: ${dbg.propagatedCount} anggota, noKK: ${dbg.propagatedNoKK || '-'}`;
+        const msg = `Tersimpan! Keterangan: "${keterangan || '-'}", BPJS: "${bpjs || '-'}". [${debugInfo}]`;
         toast.success(msg, { duration: 8000 });
         setShowForm(false);
         setSelectedPenduduk(null);

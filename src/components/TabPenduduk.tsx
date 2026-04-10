@@ -317,7 +317,22 @@ export default function TabPenduduk({ isAdmin = true }: TabPendudukProps) {
           body: JSON.stringify({ id: editingId, ...formData }),
         });
         if (res.ok) {
-          toast.success('Data berhasil diupdate');
+          const resJson = await res.json();
+          const dbg = resJson._debug || {};
+          console.log('[TAB PENDUDUK DEBUG] Edit save:', {
+            noKK: dbg.propagatedNoKK,
+            propagatedCount: dbg.propagatedCount,
+            sentKeterangan: dbg.sentKeterangan,
+            savedKeterangan: dbg.savedKeterangan,
+            sentBpjs: dbg.sentBpjs,
+            savedBpjs: dbg.savedBpjs,
+          });
+          const propInfo = dbg.propagatedCount !== undefined && dbg.propagatedCount > 0
+            ? ` (desil ter-propagasi ke ${dbg.propagatedCount} anggota keluarga)`
+            : dbg.propagatedCount === 0
+              ? ' (tidak ada anggota keluarga yang ditemukan untuk propagasi)'
+              : '';
+          toast.success(`Data berhasil diupdate${propInfo}`, { duration: 8000 });
           setShowForm(false);
           fetchPenduduk();
         } else {

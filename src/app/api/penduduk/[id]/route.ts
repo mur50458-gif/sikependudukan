@@ -57,37 +57,49 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (body.kabupatenKota !== undefined) updateData.kabupatenKota = body.kabupatenKota || null;
     if (body.provinsi !== undefined) updateData.provinsi = body.provinsi || null;
 
-    // Propagation: always propagate bantuan/bpjs/keterangan to all family members in the same KK
-    // (desil/bantuan is per-KK, not per-person, so all members should have the same)
-    let propagatedCount = 0;
-    let propagatedNoKK = '';
-    if (body.bantuan !== undefined || body.bpjs !== undefined || body.keterangan !== undefined) {
-      const existing = await db.penduduk.findUnique({ where: { id } });
-      if (existing) {
-        propagatedNoKK = existing.noKK;
-        const memberUpdate: any = {};
-        if (body.bantuan !== undefined) memberUpdate.bantuan = updateData.bantuan;
-        if (body.bpjs !== undefined) memberUpdate.bpjs = updateData.bpjs;
-        if (body.keterangan !== undefined) memberUpdate.keterangan = updateData.keterangan;
+    // Use transaction for atomic propagation + update
+    const result = await db.$transaction(async (tx) => {
+      // First update the person
+      const data = await tx.penduduk.update({
+        where: { id },
+        data: updateData,
+      });
 
-        const result = await db.penduduk.updateMany({
-          where: { noKK: existing.noKK, id: { not: id } },
+      // Then propagate to all family members in the same KK
+      // Hanya propagate field yang memiliki nilai (non-null, non-empty)
+      let propagatedCount = 0;
+      const memberUpdate: any = {};
+      // Keterangan: propagate jika ada isinya (desil, DTK, dll)
+      if (updateData.keterangan && updateData.keterangan !== null) {
+        memberUpdate.keterangan = updateData.keterangan;
+      }
+      // BPJS: propagate jika ada isinya (bukan null)
+      if (updateData.bpjs && updateData.bpjs !== null) {
+        memberUpdate.bpjs = updateData.bpjs;
+      }
+      // Bantuan: propagate jika ada isinya (bukan array kosong "[]")
+      if (updateData.bantuan && updateData.bantuan !== '[]') {
+        memberUpdate.bantuan = updateData.bantuan;
+      }
+
+      if (Object.keys(memberUpdate).length > 0) {
+        const propagationResult = await tx.penduduk.updateMany({
+          where: { noKK: data.noKK, id: { not: id } },
           data: memberUpdate,
         });
-        propagatedCount = result.count;
+        propagatedCount = propagationResult.count;
       }
-    }
 
-    const data = await db.penduduk.update({
-      where: { id },
-      data: updateData,
+      return { data, propagatedCount, propagatedNoKK: data.noKK };
     });
 
+    console.log(`[PENDUDUK UPDATE] id=${id}, noKK=${result.propagatedNoKK}, propagated=${result.propagatedCount}, keterangan=${updateData.keterangan}, bpjs=${updateData.bpjs}`);
+
     return NextResponse.json({
-      ...data,
+      ...result.data,
       _debug: {
-        propagatedCount,
-        propagatedNoKK,
+        propagatedCount: result.propagatedCount,
+        propagatedNoKK: result.propagatedNoKK,
         sentKeterangan: body.keterangan,
         savedKeterangan: updateData.keterangan,
         memberUpdateKeterangan: updateData.keterangan,
