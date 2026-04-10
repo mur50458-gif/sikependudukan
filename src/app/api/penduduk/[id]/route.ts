@@ -57,29 +57,20 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (body.kabupatenKota !== undefined) updateData.kabupatenKota = body.kabupatenKota || null;
     if (body.provinsi !== undefined) updateData.provinsi = body.provinsi || null;
 
-    // KK head propagation: if updating bantuan/bpjs/keterangan for KK head, propagate to family
-    const existing = await db.penduduk.findUnique({ where: { id } });
-    if (existing && existing.statusKeluarga === 'KEPALA KELUARGA') {
-      const shouldPropagateBantuan = body.bantuan !== undefined;
-      const shouldPropagateBpjs = body.bpjs !== undefined;
-      const shouldPropagateKeterangan = body.keterangan !== undefined;
+    // Propagation: always propagate bantuan/bpjs/keterangan to all family members in the same KK
+    // (desil/bantuan is per-KK, not per-person, so all members should have the same)
+    if (body.bantuan !== undefined || body.bpjs !== undefined || body.keterangan !== undefined) {
+      const existing = await db.penduduk.findUnique({ where: { id } });
+      if (existing) {
+        const memberUpdate: any = {};
+        if (body.bantuan !== undefined) memberUpdate.bantuan = updateData.bantuan;
+        if (body.bpjs !== undefined) memberUpdate.bpjs = updateData.bpjs;
+        if (body.keterangan !== undefined) memberUpdate.keterangan = updateData.keterangan;
 
-      if (shouldPropagateBantuan || shouldPropagateBpjs || shouldPropagateKeterangan) {
-        const members = await db.penduduk.findMany({
+        await db.penduduk.updateMany({
           where: { noKK: existing.noKK, id: { not: id } },
+          data: memberUpdate,
         });
-
-        if (members.length > 0) {
-          const memberUpdate: any = {};
-          if (shouldPropagateBantuan) memberUpdate.bantuan = updateData.bantuan;
-          if (shouldPropagateBpjs) memberUpdate.bpjs = updateData.bpjs;
-          if (shouldPropagateKeterangan) memberUpdate.keterangan = updateData.keterangan;
-
-          await db.penduduk.updateMany({
-            where: { noKK: existing.noKK, id: { not: id } },
-            data: memberUpdate,
-          });
-        }
       }
     }
 

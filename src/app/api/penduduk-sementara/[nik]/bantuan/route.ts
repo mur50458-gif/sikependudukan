@@ -27,14 +27,16 @@ export async function PUT(
       data: updateData,
     });
 
-    // Propagate keterangan to family members if this is KK head
-    if (existing.statusKeluarga === 'KEPALA KELUARGA' && body.keterangan !== undefined) {
+    // Always propagate bantuan/bpjs/keterangan to all family members in the same KK
+    if (body.bantuan !== undefined || body.bpjs !== undefined || body.keterangan !== undefined) {
+      const memberUpdate: any = {};
+      if (body.bantuan !== undefined) memberUpdate.bantuan = updateData.bantuan;
+      if (body.bpjs !== undefined) memberUpdate.bpjs = updateData.bpjs;
+      if (body.keterangan !== undefined) memberUpdate.keterangan = updateData.keterangan;
+
       await db.pendudukSementara.updateMany({
-        where: {
-          noKK: existing.noKK,
-          statusKeluarga: { not: 'KEPALA KELUARGA' },
-        },
-        data: { keterangan: updateData.keterangan },
+        where: { noKK: existing.noKK, NOT: { nik } },
+        data: memberUpdate,
       });
     }
 
