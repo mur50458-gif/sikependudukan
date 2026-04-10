@@ -32,6 +32,7 @@ interface PendudukItem {
   statusKeluarga: string;
   bantuan: string;
   bpjs: string | null;
+  keterangan: string | null;
 }
 
 interface TabCekBantuanProps {
@@ -125,7 +126,38 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
         }),
       });
       if (res.ok) {
-        // Also update penduduk sementara if NIK exists there
+        // Update semua anggota KK yang sama dengan keterangan yang sama
+        const familyMembers = allPenduduk.filter(p => p.noKK === selectedPenduduk.noKK && p.id !== selectedPenduduk.id);
+        let anggotaUpdated = 0;
+        for (const member of familyMembers) {
+          try {
+            const memberRes = await fetch(`/api/penduduk/${member.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                bantuan: jenisBantuan,
+                bpjs: bpjs || null,
+                keterangan: keterangan || null,
+              }),
+            });
+            if (memberRes.ok) anggotaUpdated++;
+          } catch {}
+
+          // Also update penduduk sementara if NIK exists
+          try {
+            await fetch(`/api/penduduk-sementara/${member.nik}/bantuan`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                bantuan: jenisBantuan,
+                bpjs: bpjs || null,
+                keterangan: keterangan || null,
+              }),
+            });
+          } catch {}
+        }
+
+        // Also update penduduk sementara for the selected penduduk
         try {
           await fetch(`/api/penduduk-sementara/${selectedPenduduk.nik}/bantuan`, {
             method: 'PUT',
@@ -138,7 +170,10 @@ export default function TabCekBantuan({ isAdmin = true }: TabCekBantuanProps) {
           });
         } catch {}
 
-        toast.success(`Data bantuan ${selectedPenduduk.namaLengkap} berhasil disimpan`);
+        const msg = anggotaUpdated > 0
+          ? `Data bantuan ${selectedPenduduk.namaLengkap} tersimpan. Keterangan otomatis diupdate untuk ${anggotaUpdated} anggota keluarga.`
+          : `Data bantuan ${selectedPenduduk.namaLengkap} berhasil disimpan.`;
+        toast.success(msg);
         setShowForm(false);
         setSelectedPenduduk(null);
         fetchPenduduk();
